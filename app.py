@@ -150,13 +150,26 @@ body { overflow-x: hidden; }
     100% { border-color: #ff004c; box-shadow: 0 0 10px rgba(255,0,76,0.5); } 
 }
 
-/* Active story expander with RGB border */
-.active-expander-marker + div[data-testid="stExpander"] {
+/* Active story expander highlight – allow for wrappers between marker and expander */
+.active-expander-marker ~ * [data-testid="stExpander"] {
     border: 2px solid #6C5DD3;
     border-radius: 8px;
     padding: 4px;
     margin: 8px 0;
     animation: rgbBorder 3s linear infinite;
+}
+/* Also tint the header (summary) for active story */
+.active-expander-marker ~ * [data-testid="stExpander"] summary {
+    background: rgba(108,93,211,0.12);
+    border-radius: 6px;
+}
+
+/* Make expander titles wrap and show full text */
+[data-testid="stExpander"] summary {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    word-break: break-word;
 }
 
 /* Active select button RGB glow */
@@ -377,8 +390,7 @@ for idx, story in enumerate(stories):
     raw_text = story.get("text", "")
     
     # Visa story som expanderbar sektion (som sidomenyn)
-    display_text = raw_text[:50] + "..." if len(raw_text) > 50 else raw_text
-    story_title = display_text or f"User Story {idx+1}"
+    story_title = (raw_text or "").strip() or f"User Story {idx+1}"
     
     # Marker element to style the next expander via CSS
     if is_active:
