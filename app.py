@@ -170,8 +170,24 @@ body { overflow-x: hidden; }
 }
 .story-row.active-story textarea {
     border-color:#6C5DD3;
-    background:rgba(108,93,211,0.08);
-    box-shadow:0 0 0 2px #6C5DD3, 0 0 16px rgba(108,93,211,0.8);
+    background:rgba(108,93,211,0.05);
+}
+.story-arrow {
+    display:none;
+    position:absolute;
+    left:-20px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:1.2rem;
+    color:#6C5DD3;
+    animation:arrowGlow 2s ease-in-out infinite alternate;
+}
+.story-row.active-story .story-arrow {
+    display:block;
+}
+@keyframes arrowGlow {
+    0% { text-shadow:0 0 5px #6C5DD3, 0 0 10px #6C5DD3; }
+    100% { text-shadow:0 0 10px #6C5DD3, 0 0 20px #6C5DD3, 0 0 30px #6C5DD3; }
 }
 </style>
 """
@@ -372,7 +388,8 @@ for idx, s in enumerate(stories):
     row_class = "story-row active-story" if is_active else "story-row"
     
     with st.container():
-        st.markdown(f"<div class='{row_class}'>", unsafe_allow_html=True)
+        st.markdown(f"<div class='{row_class}' style='position:relative;'>", unsafe_allow_html=True)
+        st.markdown("<div class='story-arrow'>▶</div>", unsafe_allow_html=True)
         
         cols = st.columns([8, 1, 1])
 
