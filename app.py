@@ -342,7 +342,6 @@ if player_name:
     update_room(room_code, ensure_player)
 
 # Stories UI
-st.subheader("User stories")
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
 
