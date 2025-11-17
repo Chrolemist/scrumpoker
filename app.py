@@ -763,7 +763,7 @@ st.subheader("Kort")
 card_container = st.container()
 with card_container:
     players_list = sorted(room.get("players", []))
-    # Clean out expired pings (older than 6s)
+    # Clean out expired pings (older than 3s)
     def _clean_pings(r):
         now = time.time()
         r["pings"] = {k: v for k, v in (r.get("pings", {}) or {}).items() if now - float(v) < 3}
@@ -786,7 +786,7 @@ with card_container:
                     is_pinged = False
                     try:
                         ts = float(pings.get(p, 0))
-                        is_pinged = (time.time() - ts) < 5
+                        is_pinged = (time.time() - ts) < 3
                     except Exception:
                         is_pinged = False
                     base_cls = "card flip" if revealed and has_vote else "card"
