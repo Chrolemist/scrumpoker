@@ -255,12 +255,20 @@ st.session_state.setdefault("_room_version", 0)
 scale_section = st.sidebar.expander("Skala")
 with scale_section:
     current_mode = room.get("scale_mode", "points")
-    mode = st.radio("Välj skala", ["T-shirt", "Poäng"], index=0 if current_mode == "tshirt" else 1, horizontal=True)
-    if (mode == "T-shirt" and current_mode != "tshirt") or (mode == "Poäng" and current_mode != "points"):
-        update_room(room_code, lambda r: r.update(scale_mode=("tshirt" if mode == "T-shirt" else "points")))
-        room = get_room(room_code)
+    default_label = "T-shirt" if current_mode == "tshirt" else "Poäng"
+    if "scale_mode_radio" not in st.session_state:
+        st.session_state["scale_mode_radio"] = default_label
 
-    if mode == "T-shirt":
+    st.radio("Välj skala", ["T-shirt", "Poäng"], key="scale_mode_radio", horizontal=True)
+    selected_label = st.session_state["scale_mode_radio"]
+    selected_mode = "tshirt" if selected_label == "T-shirt" else "points"
+
+    if selected_mode != current_mode:
+        update_room(room_code, lambda r, m=selected_mode: r.update(scale_mode=m))
+        room = get_room(room_code)
+        current_mode = room.get("scale_mode", current_mode)
+
+    if selected_mode == "tshirt":
         labels = room.get("scale_labels") or DEFAULT_TSHIRT[:]
         st.caption("T-shirt-läge visar endast valda etiketter – inga poäng.")
         # Optional: allow editing labels
@@ -455,12 +463,10 @@ if end:
                 sid = r.get("active_story_id")
                 r["revealed_for"][sid] = True
             update_room(room_code, auto_reveal)
-        st.success("⏱️ Tid slut - reveal!")
+        st.success("Tid slut!")
     # uppdatera bara när timer är aktiv så nedräkningen syns
     st_autorefresh(interval=1000, key=f"timer_refresh_{room_code}")
     st.markdown(f"<div class='timer'>⏱️ {remaining}s kvar</div>", unsafe_allow_html=True)
-else:
-    st.markdown("<div class='timer'>⏱️ Ingen timer aktiv</div>", unsafe_allow_html=True)
 
 # Voting interface
 st.subheader("Rösta")
