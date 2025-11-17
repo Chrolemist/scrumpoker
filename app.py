@@ -690,7 +690,6 @@ for idx, story in enumerate(stories):
 # No manual refresh needed; auto-refresh is enabled.
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
 st.divider()
 # Timer display
 room = get_room(room_code)  # refresh
@@ -754,8 +753,6 @@ if player_name:
 else:
     st.info("Ange namn i sidopanelen för att rösta.")
     
-st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 st.divider()
