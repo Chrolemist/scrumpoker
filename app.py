@@ -282,7 +282,7 @@ body { overflow-x: hidden; }
 .reveal-badge { background:#6C5DD3; padding:0.4rem 0.8rem; border-radius:6px; font-size:0.8rem; margin-left:0.5rem; }
 .consensus { color:#7dff00; font-weight:600; }
 .warning { color:#ffcc00; }
-.timer { font-size:1.2rem; font-weight:600; }
+.timer { font-size:1.1rem; font-weight:600; display:inline-block; text-align:center; max-width:120px; }
 /* Stories UI – tabell/lista utan extra kort */
 @keyframes rgbBorder { 
     0% { border-color: #ff004c; box-shadow: 0 0 10px rgba(255,0,76,0.5); } 
