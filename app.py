@@ -451,8 +451,13 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
                     if len(lst) > 500:
                         del lst[:-500]
                 update_room(room_code, append_msg)
-                # Expand chat and clear input on next run so user sees the message
+                # Expand chat so user sees the message
                 st.session_state["chat_expanded"] = True
+                # If debug is enabled, fetch room immediately and show saved messages
+                if st.session_state.get("chat_debug"):
+                    _r2 = get_room(room_code)
+                    st.markdown("**DEBUG (efter update_room):**")
+                    st.write(_r2.get("chat", [])[-20:])
                 st.rerun()
 
     # If debug enabled, show raw chat data for troubleshooting
