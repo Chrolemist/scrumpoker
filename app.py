@@ -153,13 +153,8 @@ body { overflow-x: hidden; }
 }
 .story-row {
     border-radius:10px;
-    padding:0.35rem 0.6rem;
-    margin-bottom:0.3rem;
-    background:#151822;
-}
-.story-row.active-story {
-    background:rgba(108,93,211,0.12);
-    box-shadow:0 0 0 1px #6C5DD3, 0 0 14px rgba(108,93,211,0.75);
+    padding:0.25rem 0.4rem;
+    margin-bottom:0.2rem;
 }
 .story-row button {
     width:100%;
@@ -177,7 +172,8 @@ body { overflow-x: hidden; }
 }
 .story-card.active-card {
     border-color:#6C5DD3;
-    box-shadow:0 0 0 1px #6C5DD3, 0 0 10px rgba(108,93,211,0.6);
+    background:rgba(108,93,211,0.08);
+    box-shadow:0 0 0 2px #6C5DD3, 0 0 16px rgba(108,93,211,0.8);
 }
 .story-card.empty-card {
     opacity:0.7;
@@ -377,27 +373,18 @@ for idx, s in enumerate(stories):
     sid = s["id"]
     is_active = sid == active_sid
     raw_text = s.get("text", "")
-    row_classes = ["story-row"]
+
+    cols = st.columns([8, 1, 1])
+
+    # Eget story-kort där RGB/glow kan ligga exakt runt texten
+    card_classes = ["story-card"]
+    display_text = raw_text or "Beskriv user story..."
+    if not raw_text:
+        card_classes.append("empty-card")
     if is_active:
-        row_classes.append("active-story")
+        card_classes.append("active-card")
 
-    with st.container():
-        st.markdown(
-            f"<div class='{' '.join(row_classes)}'>",
-            unsafe_allow_html=True,
-        )
-
-        cols = st.columns([8, 1, 1])
-
-        # Eget story-kort där RGB/glow kan ligga exakt runt texten
-        card_classes = ["story-card"]
-        display_text = raw_text or "Beskriv user story..."
-        if not raw_text:
-            card_classes.append("empty-card")
-        if is_active:
-            card_classes.append("active-card")
-
-        with cols[0]:
+    with cols[0]:
             # Visa storyn som ett stylat kort
             st.markdown(
                 f"<div class='{' '.join(card_classes)}'>{display_text}</div>",
@@ -412,32 +399,30 @@ for idx, s in enumerate(stories):
                 height=90,
             )
 
-        if cols[1].button("Välj", key=f"select_{sid}"):
-            update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
-            st.session_state["active_story_id"] = sid
-            room = get_room(room_code)
-            active_sid = room.get("active_story_id")
+    if cols[1].button("Välj", key=f"select_{sid}"):
+        update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
+        st.session_state["active_story_id"] = sid
+        room = get_room(room_code)
+        active_sid = room.get("active_story_id")
 
-        if cols[2].button("✖", key=f"del_{sid}"):
-            def delete_story(r, sid=sid):
-                r["stories"] = [o for o in r["stories"] if o["id"] != sid]
-                r.get("votes", {}).pop(sid, None)
-                r.get("revealed_for", {}).pop(sid, None)
-                if r.get("active_story_id") == sid:
-                    if r["stories"]:
-                        r["active_story_id"] = r["stories"][0]["id"]
-                    else:
-                        new_sid = uuid.uuid4().hex[:8]
-                        r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
-                        r["votes"].setdefault(new_sid, {})
-                        r["revealed_for"].setdefault(new_sid, False)
-                        r["active_story_id"] = new_sid
-            update_room(room_code, delete_story)
-            room = get_room(room_code)
-            stories = room.get("stories", [])
-            active_sid = room.get("active_story_id")
-
-        st.markdown("</div>", unsafe_allow_html=True)
+    if cols[2].button("✖", key=f"del_{sid}"):
+        def delete_story(r, sid=sid):
+            r["stories"] = [o for o in r["stories"] if o["id"] != sid]
+            r.get("votes", {}).pop(sid, None)
+            r.get("revealed_for", {}).pop(sid, None)
+            if r.get("active_story_id") == sid:
+                if r["stories"]:
+                    r["active_story_id"] = r["stories"][0]["id"]
+                else:
+                    new_sid = uuid.uuid4().hex[:8]
+                    r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
+                    r["votes"].setdefault(new_sid, {})
+                    r["revealed_for"].setdefault(new_sid, False)
+                    r["active_story_id"] = new_sid
+        update_room(room_code, delete_story)
+        room = get_room(room_code)
+        stories = room.get("stories", [])
+        active_sid = room.get("active_story_id")
 
     if text_val != raw_text:
         def update_text(r, sid=sid, text_val=text_val):
