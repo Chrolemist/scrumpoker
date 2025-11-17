@@ -450,7 +450,7 @@ with st.sidebar.expander("Chat", expanded=False):
                 st.rerun()
 
 # --- Main content ---
-# Ensure player registered
+# Ensure player registered (lägg alltid till namnet, även anonymt)
 if player_name:
     def ensure_player(r):
         if player_name not in r["players"]:
