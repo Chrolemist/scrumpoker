@@ -136,6 +136,7 @@ def cached_room(room_code, last_update):
 CSS = """
 <style>
 body { overflow-x: hidden; }
+.block-container { padding-top: 1rem !important; }
 .card-grid { display: flex; flex-wrap: wrap; gap: 1.25rem; }
 .card { position: relative; width: 100px; height: 140px; perspective: 800px; cursor: pointer; }
 .card-inner { position: absolute; width: 100%; height: 100%; transition: transform 0.8s; transform-style: preserve-3d; }
