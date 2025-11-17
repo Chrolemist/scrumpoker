@@ -60,7 +60,7 @@ def migrate_room(room: dict) -> bool:
     if "story" in room:
         title = room.get("story") or ""
         sid = uuid.uuid4().hex[:8]
-        room["stories"].append({"id": sid, "title": title, "created": time.time()})
+        room["stories"].append({"id": sid, "text": title, "created": time.time()})
         room["active_story_id"] = sid
         room.pop("story", None)
         changed = True
@@ -78,7 +78,7 @@ def migrate_room(room: dict) -> bool:
     # Ensure active story exists
     if not room["stories"]:
         sid = uuid.uuid4().hex[:8]
-        room["stories"].append({"id": sid, "title": "", "created": time.time()})
+        room["stories"].append({"id": sid, "text": "", "created": time.time()})
         room["active_story_id"] = sid
         changed = True
     if room["active_story_id"] not in {s["id"] for s in room["stories"]}:
@@ -88,6 +88,10 @@ def migrate_room(room: dict) -> bool:
     sid = room["active_story_id"]
     room["votes"].setdefault(sid, {})
     room["revealed_for"].setdefault(sid, False)
+    # Normalize story items to have 'text' key
+    for s in room["stories"]:
+        if "text" not in s:
+            s["text"] = s.pop("title", "")
     return changed
 
 def update_room(room_code, mutate_fn):
@@ -156,9 +160,24 @@ st.sidebar.header("Inställningar")
 room_code = st.sidebar.text_input("Rumskod", value=st.session_state.get("room_code", "TEAM1"))
 if room_code != st.session_state.get("room_code"):
     st.session_state["room_code"] = room_code
-player_name = st.sidebar.text_input("Ditt namn", value=st.session_state.get("player_name", ""))
-if player_name != st.session_state.get("player_name"):
+_prev_name = st.session_state.get("player_name", "")
+player_name = st.sidebar.text_input("Ditt namn", value=_prev_name)
+if player_name != _prev_name:
+    # update local state immediately
     st.session_state["player_name"] = player_name
+    # propagate rename in room (autosave)
+    def apply_rename(r):
+        # players list
+        if _prev_name and _prev_name in r["players"]:
+            r["players"] = [player_name if n == _prev_name else n for n in r["players"]]
+        if player_name and player_name not in r["players"]:
+            r["players"].append(player_name)
+        # votes across all stories
+        for sid, pv in r.get("votes", {}).items():
+            if _prev_name and _prev_name in pv:
+                val = pv.pop(_prev_name)
+                pv[player_name] = val
+    update_room(room_code, apply_rename)
 
 # --- Room bootstrap & autorefresh ---
 room = get_room(room_code)
@@ -263,56 +282,97 @@ if player_name:
 st.subheader("User stories")
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
-titles_map = {s["id"]: s.get("title", "") for s in stories}
 
-with st.container():
-    col_new1, col_new2 = st.columns([3,1])
-    new_title = col_new1.text_input("Ny user story", placeholder="Som <roll> vill jag <mål> så att <nytta>...")
-    if col_new2.button("+ Lägg till") and new_title.strip():
-        def add_story(r):
-            sid = uuid.uuid4().hex[:8]
-            r["stories"].append({"id": sid, "title": new_title.strip(), "created": time.time()})
-            r["active_story_id"] = sid
-            r["votes"].setdefault(sid, {})
-            r["revealed_for"].setdefault(sid, False)
-        update_room(room_code, add_story)
-        room = get_room(room_code)
-        stories = room.get("stories", [])
-        active_sid = room.get("active_story_id")
-        titles_map = {s["id"]: s.get("title", "") for s in stories}
-
-sel = st.selectbox(
-    "Aktiv story",
-    options=list(titles_map.keys()),
-    format_func=lambda sid: titles_map.get(sid, sid),
-    index=(list(titles_map.keys()).index(active_sid) if active_sid in titles_map else 0)
-)
-if sel != active_sid:
-    update_room(room_code, lambda r: r.update(active_story_id=sel))
+# New story button (no title required)
+if st.button("+ Ny story"):
+    def add_story(r):
+        sid = uuid.uuid4().hex[:8]
+        r["stories"].append({"id": sid, "text": "", "created": time.time()})
+        r["active_story_id"] = sid
+        r["votes"].setdefault(sid, {})
+        r["revealed_for"].setdefault(sid, False)
+    update_room(room_code, add_story)
     room = get_room(room_code)
+    stories = room.get("stories", [])
     active_sid = room.get("active_story_id")
 
-# Show stories as cards with active RGB border
-cards_html = ["<div class='story-list'>"]
-for s in stories:
-    cls = "story-card active" if s["id"] == active_sid else "story-card"
-    t = (s.get("title", "") or "(tom)").replace("<", "&lt;").replace(">", "&gt;")
-    cards_html.append(f"<div class='{cls}'>{t}</div>")
-cards_html.append("</div>")
-st.markdown("".join(cards_html), unsafe_allow_html=True)
+# Inline editable stories list with RGB highlight on active
+list_html = ["<div class='story-list'>"]
+st.markdown("".join(list_html), unsafe_allow_html=True)
 
-# Edit active story text
-active_title = titles_map.get(active_sid, "")
-edited = st.text_area("Användarberättelse (aktiv)", value=active_title, placeholder="Beskriv storyn...", key="active_story_text")
-if edited != active_title:
-    def update_title(r):
-        sid = r.get("active_story_id")
-        for obj in r["stories"]:
-            if obj["id"] == sid:
-                obj["title"] = edited
-                break
-    update_room(room_code, update_title)
-    room = get_room(room_code)
+for idx, s in enumerate(stories):
+    sid = s["id"]
+    cls = "story-card active" if sid == active_sid else "story-card"
+    with st.container():
+        st.markdown(f"<div class='{cls}'>", unsafe_allow_html=True)
+        cols = st.columns([7,1,1,1,1])
+        # Compact text field with autosave
+        text_val = cols[0].text_input(" ", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="collapsed", placeholder="Beskriv user story...")
+        if text_val != s.get("text", ""):
+            def update_text(r):
+                for obj in r["stories"]:
+                    if obj["id"] == sid:
+                        obj["text"] = text_val
+                        break
+                # auto-select when edited
+                r["active_story_id"] = sid
+            update_room(room_code, update_text)
+            room = get_room(room_code)
+            stories = room.get("stories", [])
+            active_sid = room.get("active_story_id")
+
+        # Select button
+        if cols[1].button("Välj", key=f"select_{sid}"):
+            update_room(room_code, lambda r: r.update(active_story_id=sid))
+            room = get_room(room_code)
+            active_sid = room.get("active_story_id")
+
+        # Move up
+        up_disabled = idx == 0
+        if cols[2].button("↑", key=f"up_{sid}") and not up_disabled:
+            def move_up(r):
+                arr = r["stories"]
+                i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
+                if i and i > 0:
+                    arr[i-1], arr[i] = arr[i], arr[i-1]
+            update_room(room_code, move_up)
+            room = get_room(room_code)
+            stories = room.get("stories", [])
+
+        # Move down
+        down_disabled = idx >= len(stories) - 1
+        if cols[3].button("↓", key=f"down_{sid}") and not down_disabled:
+            def move_down(r):
+                arr = r["stories"]
+                i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
+                if i is not None and i < len(arr) - 1:
+                    arr[i+1], arr[i] = arr[i], arr[i+1]
+            update_room(room_code, move_down)
+            room = get_room(room_code)
+            stories = room.get("stories", [])
+
+        # Delete
+        if cols[4].button("✖", key=f"del_{sid}"):
+            def delete_story(r):
+                r["stories"] = [o for o in r["stories"] if o["id"] != sid]
+                # remove votes and revealed entries
+                r.get("votes", {}).pop(sid, None)
+                r.get("revealed_for", {}).pop(sid, None)
+                # adjust active id
+                if r.get("active_story_id") == sid:
+                    if r["stories"]:
+                        r["active_story_id"] = r["stories"][0]["id"]
+                    else:
+                        new_sid = uuid.uuid4().hex[:8]
+                        r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
+                        r["votes"].setdefault(new_sid, {})
+                        r["revealed_for"].setdefault(new_sid, False)
+                        r["active_story_id"] = new_sid
+            update_room(room_code, delete_story)
+            room = get_room(room_code)
+            stories = room.get("stories", [])
+            active_sid = room.get("active_story_id")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # No manual refresh needed; auto-refresh is enabled.
 
@@ -428,5 +488,5 @@ if revealed and all_votes:
     else:
         st.markdown("<span class='warning'>⚠️ Ingen konsensus ännu</span>", unsafe_allow_html=True)
 
-_tm = {s["id"]: s.get("title", "") for s in room.get("stories", [])}
+_tm = {s["id"]: s.get("text", "") for s in room.get("stories", [])}
 st.caption(f"Rum: {room_code} • Story: {_tm.get(active_sid, '')} • Spelare: {len(room.get('players', []))} • Röster: {len(all_votes)}")
