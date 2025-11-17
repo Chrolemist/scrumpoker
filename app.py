@@ -2,17 +2,13 @@ import json, time, threading, uuid
 from pathlib import Path
 import statistics
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 ROOMS_LOCK = threading.Lock()
 ROOMS_FILE = Path("rooms_state.json")
 
-DEFAULT_SCALE = {
-    "XS": 1,
-    "S": 2,
-    "M": 3,
-    "L": 5,
-    "XL": 8,
-}
+DEFAULT_TSHIRT = ["XS", "S", "M", "L", "XL"]
+DEFAULT_SCALE = {"XS": 1, "S": 2, "M": 3, "L": 5, "XL": 8}
 
 def load_rooms():
     if not ROOMS_FILE.exists():
@@ -31,31 +27,93 @@ def init_room(rooms, room_code):
     if room_code not in rooms:
         rooms[room_code] = {
             "created": time.time(),
-            "story": "",
+            # Stories
+            "stories": [],  # list of {id, title, created}
+            "active_story_id": None,
+            # scale_mode: 'points' => uses 'scale' mapping; 'tshirt' => uses 'scale_labels'
+            "scale_mode": "points",
             "scale": DEFAULT_SCALE.copy(),
-            "votes": {},  # player_name -> value
-            "revealed": False,
+            "scale_labels": DEFAULT_TSHIRT[:],
+            # votes: story_id -> {player_name -> value}
+            "votes": {},
+            # revealed_for: story_id -> bool
+            "revealed_for": {},
             "timer": {
                 "end": None,
                 "duration": 0,
             },
-            "players": set(),
+            "players": [],
             "last_update": time.time(),
         }
+
+def migrate_room(room: dict) -> bool:
+    """Migrate older single-story schema to multi-story schema. Returns True if modified."""
+    changed = False
+    # If single 'story' key exists, migrate it
+    if "stories" not in room:
+        room["stories"] = []
+        changed = True
+    if "active_story_id" not in room:
+        room["active_story_id"] = None
+        changed = True
+    # Migrate old single fields
+    if "story" in room:
+        title = room.get("story") or ""
+        sid = uuid.uuid4().hex[:8]
+        room["stories"].append({"id": sid, "title": title, "created": time.time()})
+        room["active_story_id"] = sid
+        room.pop("story", None)
+        changed = True
+        # Migrate votes and revealed
+        old_votes = room.get("votes", {})
+        if isinstance(old_votes, dict) and (not old_votes or all(not isinstance(v, dict) for v in old_votes.values())):
+            room["votes"] = {sid: old_votes}
+        if "revealed" in room:
+            room["revealed_for"] = {sid: bool(room.get("revealed", False))}
+            room.pop("revealed", None)
+    # Ensure keys exist
+    room.setdefault("votes", {})
+    room.setdefault("revealed_for", {})
+    room.setdefault("players", [])
+    # Ensure active story exists
+    if not room["stories"]:
+        sid = uuid.uuid4().hex[:8]
+        room["stories"].append({"id": sid, "title": "", "created": time.time()})
+        room["active_story_id"] = sid
+        changed = True
+    if room["active_story_id"] not in {s["id"] for s in room["stories"]}:
+        room["active_story_id"] = room["stories"][0]["id"]
+        changed = True
+    # Ensure dicts for current story
+    sid = room["active_story_id"]
+    room["votes"].setdefault(sid, {})
+    room["revealed_for"].setdefault(sid, False)
+    return changed
 
 def update_room(room_code, mutate_fn):
     with ROOMS_LOCK:
         rooms = load_rooms()
         init_room(rooms, room_code)
+        # migrate before mutation
+        if migrate_room(rooms[room_code]):
+            pass
         mutate_fn(rooms[room_code])
         rooms[room_code]["last_update"] = time.time()
-        # Convert set to list for JSON
-        rooms[room_code]["players"] = list(rooms[room_code]["players"])
+        # Ensure players is a unique list
+        if isinstance(rooms[room_code].get("players"), set):
+            rooms[room_code]["players"] = list(rooms[room_code]["players"])
+        rooms[room_code]["players"] = list(dict.fromkeys(rooms[room_code]["players"]))
         save_rooms(rooms)
 
 def get_room(room_code):
     rooms = load_rooms()
-    return rooms.get(room_code)
+    room = rooms.get(room_code)
+    if room is None:
+        return None
+    if migrate_room(room):
+        rooms[room_code] = room
+        save_rooms(rooms)
+    return room
 
 # --- UI Helpers ---
 @st.cache_data(ttl=5)
@@ -78,6 +136,12 @@ body { overflow-x: hidden; }
 .consensus { color:#7dff00; font-weight:600; }
 .warning { color:#ffcc00; }
 .timer { font-size:1.2rem; font-weight:600; }
+/* Stories UI */
+.story-list { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; }
+.story-card { padding:0.75rem 1rem; background:#1B1F29; border-radius:12px; border:2px solid #2b2f3b; position:relative; }
+.story-card:hover { border-color:#6C5DD3; box-shadow:0 0 8px rgba(108,93,211,.4); }
+.story-card.active { animation: rgbBorder 2s linear infinite; border-color: transparent; }
+@keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
 </style>
 """
 
@@ -85,7 +149,7 @@ st.set_page_config(page_title="Scrum Poker", page_icon="🃏", layout="wide")
 st.markdown(CSS, unsafe_allow_html=True)
 
 st.title("🃏 Scrum Poker")
-st.caption("Mörkt tema • Flip-kort • Live-röstning")
+st.caption("Mörkt tema • Flip-kort • Live-röstning • Flera user stories")
 
 # --- Sidebar setup ---
 st.sidebar.header("Inställningar")
@@ -96,15 +160,71 @@ player_name = st.sidebar.text_input("Ditt namn", value=st.session_state.get("pla
 if player_name != st.session_state.get("player_name"):
     st.session_state["player_name"] = player_name
 
-scale_cols = st.sidebar.columns(2)
-custom_scale_expander = st.sidebar.expander("Anpassa skala")
-with custom_scale_expander:
-    st.write("Standardvärden kan ändras här.")
-    new_scale = {}
-    for label, default in DEFAULT_SCALE.items():
-        new_scale[label] = st.number_input(label, value=default, step=1, min_value=0)
-    if st.button("Spara skala"):
-        update_room(room_code, lambda r: r.update(scale=new_scale))
+# --- Room bootstrap & autorefresh ---
+room = get_room(room_code)
+if not room:
+    update_room(room_code, lambda r: r)
+    room = get_room(room_code)
+
+# Auto-refresh all clients periodically
+st_autorefresh(interval=1500, key=f"refresh_{room_code}")
+
+# --- Scale settings ---
+scale_section = st.sidebar.expander("Skala")
+with scale_section:
+    current_mode = room.get("scale_mode", "points")
+    mode = st.radio("Välj skala", ["T-shirt", "Poäng"], index=0 if current_mode == "tshirt" else 1, horizontal=True)
+    if (mode == "T-shirt" and current_mode != "tshirt") or (mode == "Poäng" and current_mode != "points"):
+        update_room(room_code, lambda r: r.update(scale_mode=("tshirt" if mode == "T-shirt" else "points")))
+        room = get_room(room_code)
+
+    if mode == "T-shirt":
+        labels = room.get("scale_labels") or DEFAULT_TSHIRT[:]
+        st.caption("T-shirt-läge visar endast valda etiketter – inga poäng.")
+        # Optional: allow editing labels
+        with st.popover("Redigera etiketter"):
+            new_labels = []
+            for i, lab in enumerate(labels):
+                nl = st.text_input(f"Etikett {i+1}", value=lab, key=f"lab_{i}")
+                if nl:
+                    new_labels.append(nl)
+            col_add, col_save = st.columns(2)
+            if col_add.button("+ Lägg till etikett"):
+                new_labels.append(f"E{i+2}")
+            if col_save.button("Spara etiketter") and new_labels:
+                update_room(room_code, lambda r: r.update(scale_labels=new_labels))
+                room = get_room(room_code)
+    else:
+        # Custom points builder with dynamic components
+        st.caption("Bygg eget poängsystem. Lägg till valfria kort.")
+        if "custom_points" not in st.session_state:
+            # seed from room scale
+            scale_map = room.get("scale", DEFAULT_SCALE)
+            st.session_state.custom_points = [
+                {"label": k, "value": v} for k, v in scale_map.items()
+            ]
+        cp = st.session_state.custom_points
+        col_add, col_reset = st.columns(2)
+        if col_add.button("+ Lägg till poängkort"):
+            cp.append({"label": f"{len(cp)+1}", "value": 0})
+        if col_reset.button("Återställ till standard"):
+            st.session_state.custom_points = [{"label": k, "value": v} for k, v in DEFAULT_SCALE.items()]
+            cp = st.session_state.custom_points
+        remove_indices = []
+        for i, item in enumerate(cp):
+            c1, c2, c3 = st.columns([2,2,1])
+            item["label"] = c1.text_input("Etikett", value=str(item.get("label", "")), key=f"cp_label_{i}")
+            item["value"] = c2.number_input("Värde", value=float(item.get("value", 0)), step=1.0, key=f"cp_value_{i}")
+            if c3.button("✖", key=f"cp_del_{i}"):
+                remove_indices.append(i)
+        if remove_indices:
+            for idx in sorted(remove_indices, reverse=True):
+                cp.pop(idx)
+        if st.button("Spara poängsystem"):
+            new_scale = {str(it["label"]): float(it["value"]) for it in cp if str(it["label"]).strip() != ""}
+            if new_scale:
+                update_room(room_code, lambda r: r.update(scale=new_scale))
+                room = get_room(room_code)
 
 # Timer controls (facilitator)
 with st.sidebar.expander("Timer"):
@@ -120,42 +240,95 @@ with st.sidebar.expander("Timer"):
 with st.sidebar.expander("Omröstning"):
     col_r1, col_r2 = st.columns(2)
     if col_r1.button("Reveal"):
-        update_room(room_code, lambda r: r.update(revealed=True))
+        def set_reveal(r):
+            sid = r.get("active_story_id")
+            r["revealed_for"][sid] = True
+        update_room(room_code, set_reveal)
     if col_r2.button("Reset"):
         def do_reset(r):
-            r["votes"] = {}
-            r["revealed"] = False
+            sid = r.get("active_story_id")
+            r["votes"][sid] = {}
+            r["revealed_for"][sid] = False
         update_room(room_code, do_reset)
 
 # --- Main content ---
-room = get_room(room_code)
-if not room:
-    # ensure room exists
-    update_room(room_code, lambda r: r)
-    room = get_room(room_code)
-
 # Ensure player registered
 if player_name:
-    update_room(room_code, lambda r: r["players"].append(player_name) if player_name not in r["players"] else None)
+    def ensure_player(r):
+        if player_name not in r["players"]:
+            r["players"].append(player_name)
+    update_room(room_code, ensure_player)
 
-# Story input (only updates on change)
-story_text = st.text_area("Användarberättelse", value=room.get("story", ""), placeholder="Som <roll> vill jag <mål> så att <nytta>...")
-if story_text != room.get("story"):
-    update_room(room_code, lambda r: r.update(story=story_text))
+# Stories UI
+st.subheader("User stories")
+stories = room.get("stories", [])
+active_sid = room.get("active_story_id")
+titles_map = {s["id"]: s.get("title", "") for s in stories}
+
+with st.container():
+    col_new1, col_new2 = st.columns([3,1])
+    new_title = col_new1.text_input("Ny user story", placeholder="Som <roll> vill jag <mål> så att <nytta>...")
+    if col_new2.button("+ Lägg till") and new_title.strip():
+        def add_story(r):
+            sid = uuid.uuid4().hex[:8]
+            r["stories"].append({"id": sid, "title": new_title.strip(), "created": time.time()})
+            r["active_story_id"] = sid
+            r["votes"].setdefault(sid, {})
+            r["revealed_for"].setdefault(sid, False)
+        update_room(room_code, add_story)
+        room = get_room(room_code)
+        stories = room.get("stories", [])
+        active_sid = room.get("active_story_id")
+        titles_map = {s["id"]: s.get("title", "") for s in stories}
+
+sel = st.selectbox(
+    "Aktiv story",
+    options=list(titles_map.keys()),
+    format_func=lambda sid: titles_map.get(sid, sid),
+    index=(list(titles_map.keys()).index(active_sid) if active_sid in titles_map else 0)
+)
+if sel != active_sid:
+    update_room(room_code, lambda r: r.update(active_story_id=sel))
+    room = get_room(room_code)
+    active_sid = room.get("active_story_id")
+
+# Show stories as cards with active RGB border
+cards_html = ["<div class='story-list'>"]
+for s in stories:
+    cls = "story-card active" if s["id"] == active_sid else "story-card"
+    t = (s.get("title", "") or "(tom)").replace("<", "&lt;").replace(">", "&gt;")
+    cards_html.append(f"<div class='{cls}'>{t}</div>")
+cards_html.append("</div>")
+st.markdown("".join(cards_html), unsafe_allow_html=True)
+
+# Edit active story text
+active_title = titles_map.get(active_sid, "")
+edited = st.text_area("Användarberättelse (aktiv)", value=active_title, placeholder="Beskriv storyn...", key="active_story_text")
+if edited != active_title:
+    def update_title(r):
+        sid = r.get("active_story_id")
+        for obj in r["stories"]:
+            if obj["id"] == sid:
+                obj["title"] = edited
+                break
+    update_room(room_code, update_title)
     room = get_room(room_code)
 
-# Refresh button
-st.button("🔄 Uppdatera", type="secondary")
+# No manual refresh needed; auto-refresh is enabled.
 
 # Timer display
 room = get_room(room_code)  # refresh
+active_sid = room.get("active_story_id")
 end = room["timer"]["end"]
 if end:
     remaining = int(end - time.time())
     if remaining <= 0:
         remaining = 0
-        if not room["revealed"]:
-            update_room(room_code, lambda r: r.update(revealed=True))
+        if not room["revealed_for"].get(active_sid, False):
+            def auto_reveal(r):
+                sid = r.get("active_story_id")
+                r["revealed_for"][sid] = True
+            update_room(room_code, auto_reveal)
         st.success("⏱️ Tid slut - reveal!")
     st.markdown(f"<div class='timer'>⏱️ {remaining}s kvar</div>", unsafe_allow_html=True)
 else:
@@ -163,28 +336,49 @@ else:
 
 # Voting interface
 st.subheader("Rösta")
+scale_mode = room.get("scale_mode", "points")
 current_scale = room.get("scale", DEFAULT_SCALE)
+current_labels = room.get("scale_labels", DEFAULT_TSHIRT)
 vote_placeholder = st.empty()
 player_vote = None
+votes_for_active = room.get("votes", {}).get(active_sid, {})
 if player_name:
-    player_vote = room["votes"].get(player_name)
-    card_cols = st.columns(len(current_scale))
-    idx = 0
-    for label, val in current_scale.items():
-        with card_cols[idx]:
-            vote_btn = st.button(label, key=f"vote_{label}")
-            if vote_btn:
-                def set_vote(r):
-                    r["votes"][player_name] = val
-                update_room(room_code, set_vote)
-                room = get_room(room_code)
-        idx += 1
+    player_vote = votes_for_active.get(player_name)
+    if scale_mode == "tshirt":
+        card_cols = st.columns(len(current_labels))
+        for idx, label in enumerate(current_labels):
+            with card_cols[idx]:
+                vote_btn = st.button(label, key=f"vote_t_{label}")
+                if vote_btn:
+                    def set_vote(r):
+                        sid = r.get("active_story_id")
+                        r["votes"].setdefault(sid, {})
+                        r["votes"][sid][player_name] = str(label)
+                    update_room(room_code, set_vote)
+                    room = get_room(room_code)
+                    votes_for_active = room.get("votes", {}).get(active_sid, {})
+    else:
+        # points mode
+        items = list(current_scale.items())
+        card_cols = st.columns(len(items))
+        for idx, (label, val) in enumerate(items):
+            with card_cols[idx]:
+                vote_btn = st.button(label, key=f"vote_p_{label}")
+                if vote_btn:
+                    def set_vote(r):
+                        sid = r.get("active_story_id")
+                        r["votes"].setdefault(sid, {})
+                        r["votes"][sid][player_name] = float(val)
+                    update_room(room_code, set_vote)
+                    room = get_room(room_code)
+                    votes_for_active = room.get("votes", {}).get(active_sid, {})
 else:
     st.info("Ange namn i sidopanelen för att rösta.")
 
 room = get_room(room_code)
-all_votes = room["votes"]
-revealed = room["revealed"]
+active_sid = room.get("active_story_id")
+all_votes = room.get("votes", {}).get(active_sid, {})
+revealed = room.get("revealed_for", {}).get(active_sid, False)
 
 st.subheader("Kort")
 card_container = st.container()
@@ -194,7 +388,7 @@ with card_container:
         has_vote = p in all_votes
         val = all_votes.get(p, "?")
         card_classes = "card flip" if revealed and has_vote else "card"
-        front_content = p if not revealed else p
+        front_content = p
         back_content = val if revealed and has_vote else "?"
         card_html = f"<div class='{card_classes}'><div class='card-inner'>" \
                     f"<div class='card-face card-front'>{front_content}</div>" \
@@ -207,19 +401,32 @@ with card_container:
 # Stats once revealed
 if revealed and all_votes:
     values = list(all_votes.values())
-    mean_val = statistics.mean(values)
-    try:
-        stdev_val = statistics.pstdev(values)
-    except statistics.StatisticsError:
-        stdev_val = 0
     consensus = len(set(values)) == 1
-    cols_stats = st.columns(3)
-    cols_stats[0].metric("Medel", f"{mean_val:.2f}")
-    cols_stats[1].metric("Stdavvikelse", f"{stdev_val:.2f}")
-    cols_stats[2].metric("Röster", f"{len(values)}")
+    if scale_mode == "points":
+        try:
+            num_vals = [float(v) for v in values]
+            mean_val = statistics.mean(num_vals)
+            try:
+                stdev_val = statistics.pstdev(num_vals)
+            except statistics.StatisticsError:
+                stdev_val = 0
+            cols_stats = st.columns(3)
+            cols_stats[0].metric("Medel", f"{mean_val:.2f}")
+            cols_stats[1].metric("Stdavvikelse", f"{stdev_val:.2f}")
+            cols_stats[2].metric("Röster", f"{len(values)}")
+        except Exception:
+            st.write("Kan inte beräkna statistik för dessa värden.")
+    else:
+        # Label frequency for T-shirt mode
+        from collections import Counter
+        counts = Counter([str(v) for v in values])
+        st.write("Frekvens:")
+        for lab, cnt in counts.items():
+            st.write(f"- {lab}: {cnt}")
     if consensus:
         st.markdown("<span class='consensus'>✅ Konsensus uppnådd!</span>", unsafe_allow_html=True)
     else:
         st.markdown("<span class='warning'>⚠️ Ingen konsensus ännu</span>", unsafe_allow_html=True)
 
-st.caption(f"Rum: {room_code} • Spelare: {len(room.get('players', []))} • Röster: {len(all_votes)}")
+_tm = {s["id"]: s.get("title", "") for s in room.get("stories", [])}
+st.caption(f"Rum: {room_code} • Story: {_tm.get(active_sid, '')} • Spelare: {len(room.get('players', []))} • Röster: {len(all_votes)}")
