@@ -688,7 +688,13 @@ for idx, story in enumerate(stories):
     # No closing needed; marker styles the immediate next expander
 
 # No manual refresh needed; auto-refresh is enabled.
-
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+st.divider()
 # Timer display
 room = get_room(room_code)  # refresh
 if not room:
