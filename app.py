@@ -453,17 +453,19 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
                 update_room(room_code, append_msg)
                 # Expand chat so user sees the message
                 st.session_state["chat_expanded"] = True
-                # If debug is enabled, fetch room immediately and show saved messages
-                if st.session_state.get("chat_debug"):
-                    _r2 = get_room(room_code)
-                    st.markdown("**DEBUG (efter update_room):**")
-                    st.write(_r2.get("chat", [])[-20:])
+                # Fetch room immediately and save a persistent snapshot in session_state
+                _r2 = get_room(room_code)
+                st.session_state["_last_sent_chat_snapshot"] = _r2.get("chat", [])[-20:]
                 st.rerun()
 
-    # If debug enabled, show raw chat data for troubleshooting
+    # If debug enabled, show raw chat data or the last sent snapshot so it doesn't blink
     if st.session_state.get("chat_debug"):
-        st.markdown("**DEBUG: senaste meddelanden (rå data)**")
-        st.write(room.get("chat", [])[-20:])
+        st.markdown("**DEBUG: senaste meddelanden (rå data / snapshot)**")
+        snap = st.session_state.get("_last_sent_chat_snapshot")
+        if snap is not None:
+            st.write(snap)
+        else:
+            st.write(room.get("chat", [])[-20:])
 
 # --- Main content ---
 # Ensure player registered (lägg alltid till namnet, även anonymt)
