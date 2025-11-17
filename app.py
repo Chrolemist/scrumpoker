@@ -444,6 +444,9 @@ for idx, story in enumerate(stories):
 
 # Timer display
 room = get_room(room_code)  # refresh
+if not room:
+    update_room(room_code, lambda r: r)
+    room = get_room(room_code)
 active_sid = room.get("active_story_id")
 end = room["timer"]["end"]
 if end:
@@ -504,6 +507,9 @@ else:
     st.info("Ange namn i sidopanelen för att rösta.")
 
 room = get_room(room_code)
+if not room:
+    update_room(room_code, lambda r: r)
+    room = get_room(room_code)
 active_sid = room.get("active_story_id")
 all_votes = room.get("votes", {}).get(active_sid, {})
 revealed = room.get("revealed_for", {}).get(active_sid, False)
