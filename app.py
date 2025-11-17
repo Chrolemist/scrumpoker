@@ -142,32 +142,31 @@ body { overflow-x: hidden; }
 .consensus { color:#7dff00; font-weight:600; }
 .warning { color:#ffcc00; }
 .timer { font-size:1.2rem; font-weight:600; }
-/* Stories UI */
+/* Stories UI – utan :has, fungerar i alla moderna browsers */
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
-.story-anchor { display:none; }
-div[data-testid='stVerticalBlock']:has(> .story-anchor) {
+.story-card-wrapper {
     background:#1B1F29;
     border:2px solid #2b2f3b;
     border-radius:14px;
     padding:0.7rem 0.9rem;
     margin-bottom:0.75rem;
 }
-div[data-testid='stVerticalBlock']:has(> .story-anchor.active) {
+.story-card-wrapper.active-story {
     border-color:transparent;
     animation: rgbBorder 2s linear infinite;
 }
-div[data-testid='stVerticalBlock']:has(> .story-anchor.empty) textarea {
+.story-card-wrapper.empty textarea {
     opacity:0.65;
     font-style:italic;
 }
-div[data-testid='stVerticalBlock']:has(> .story-anchor) textarea {
+.story-card-wrapper textarea {
     background:#11131a;
     border:1px solid #2b2f3b;
     border-radius:10px;
     color:#f0f0f4;
     min-height:100px;
 }
-div[data-testid='stVerticalBlock']:has(> .story-anchor) button {
+.story-card-wrapper button {
     width:100%;
     height:40px;
 }
@@ -356,15 +355,18 @@ for idx, s in enumerate(stories):
     sid = s["id"]
     is_active = sid == active_sid
     raw_text = s.get("text", "")
-    story_container = st.container()
-    anchor_classes = ["story-anchor"]
+    wrapper_classes = ["story-card-wrapper"]
     if is_active:
-        anchor_classes.append("active")
+        wrapper_classes.append("active-story")
     if not raw_text.strip():
-        anchor_classes.append("empty")
-    story_container.markdown(f"<span class='{' '.join(anchor_classes)}'></span>", unsafe_allow_html=True)
+        wrapper_classes.append("empty")
 
-    with story_container:
+    with st.container():
+        st.markdown(
+            f"<div class='{' '.join(wrapper_classes)}'>",
+            unsafe_allow_html=True,
+        )
+
         cols = st.columns([7,1,1,1,1])
 
         # Inline text area editing
@@ -417,6 +419,8 @@ for idx, s in enumerate(stories):
         room = get_room(room_code)
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # No manual refresh needed; auto-refresh is enabled.
 
