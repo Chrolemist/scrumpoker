@@ -750,6 +750,10 @@ if player_name:
                     votes_for_active = room.get("votes", {}).get(active_sid, {})
 else:
     st.info("Ange namn i sidopanelen för att rösta.")
+    
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+st.divider()
 
 room = get_room(room_code)
 if not room:
