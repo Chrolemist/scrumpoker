@@ -434,7 +434,23 @@ with st.sidebar.expander("Chat", expanded=False):
     # Send form
     with st.form(key="chat_form"):
         chat_text = st.text_input("Skriv ett meddelande", key="chat_input", placeholder="Skriv ett meddelande…")
-        sent = st.form_submit_button("Skicka")
+
+        btn_emoji, btn_add, btn_send = st.columns([1, 0.6, 1])
+        with btn_emoji:
+            emoji_options = ["—", "😀", "😅", "😂", "🙌", "👍", "🎉", "❤️", "🔥", "🙏", "🚀", "🤔"]
+            st.selectbox("Emoji", options=emoji_options, index=0, key="chat_emoji_select", label_visibility="collapsed")
+        with btn_add:
+            add_emoji = st.form_submit_button("➕")
+        with btn_send:
+            sent = st.form_submit_button("Skicka")
+
+        if add_emoji:
+            e = st.session_state.get("chat_emoji_select")
+            if e and e != "—":
+                st.session_state["chat_input"] = (chat_text or "") + e
+                st.session_state["chat_emoji_select"] = "—"
+            st.rerun()
+
         if sent:
             msg = (chat_text or "").strip()
             if not me:
