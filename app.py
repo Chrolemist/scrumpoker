@@ -141,13 +141,14 @@ body { overflow-x: hidden; }
 .warning { color:#ffcc00; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI */
-.story-container { padding:0.6rem 0.8rem; background:#1B1F29; border-radius:10px; border:2px solid #2b2f3b; margin-bottom: 10px; }
-.story-container:hover { border-color:#6C5DD3; box-shadow:0 0 8px rgba(108,93,211,.4); }
-.story-active { padding:0.6rem 0.8rem; background:#1B1F29; border-radius:10px; border:2px solid transparent; margin-bottom: 10px; animation: rgbBorder 2s linear infinite; }
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
-/* Hide default streamlit padding */
-.story-container > div, .story-active > div { margin-top: 0 !important; margin-bottom: 0 !important; }
-.story-container .stTextInput > div > div, .story-active .stTextInput > div > div { margin-bottom: 0 !important; }
+/* Aggressive removal of Streamlit default spacing */
+.stTextInput { margin-bottom: 0 !important; margin-top: 0 !important; }
+.stTextInput > div { margin-bottom: 0 !important; margin-top: 0 !important; }
+.stTextInput > label { margin-bottom: 0 !important; margin-top: 0 !important; display: none !important; }
+.stTextInput input { margin-bottom: 0 !important; margin-top: 0 !important; }
+.element-container { margin-bottom: 0 !important; margin-top: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+.row-widget { margin-bottom: 0 !important; margin-top: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
 </style>
 """
 
@@ -315,16 +316,17 @@ for idx, s in enumerate(stories):
     is_active = sid == active_sid
     
     # Apply RGB border via custom container class
-    border_style = "border: 2px solid transparent; box-shadow: 0 0 0 2px #00e1ff; border-radius: 8px; padding: 8px; margin-bottom: 8px; background: #1B1F29;" if is_active else "border: 2px solid #2b2f3b; border-radius: 8px; padding: 8px; margin-bottom: 8px; background: #1B1F29;"
     if is_active:
-        border_style = "border: 2px solid transparent; animation: rgbBorder 2s linear infinite; border-radius: 8px; padding: 8px; margin-bottom: 8px; background: #1B1F29;"
+        border_style = "border: 2px solid transparent; animation: rgbBorder 2s linear infinite; border-radius: 8px; padding: 6px; margin-bottom: 6px; background: #1B1F29;"
+    else:
+        border_style = "border: 2px solid #2b2f3b; border-radius: 8px; padding: 6px; margin-bottom: 6px; background: #1B1F29;"
     
     st.markdown(f'<div style="{border_style}">', unsafe_allow_html=True)
     
     cols = st.columns([7,1,1,1,1])
     
-    # Text input with autosave
-    text_val = cols[0].text_input("Story", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="collapsed", placeholder="Beskriv user story...")
+    # Text input with autosave (no label, completely hidden)
+    text_val = cols[0].text_input("x", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="hidden", placeholder="Beskriv user story...")
     if text_val != s.get("text", ""):
         def update_text(r):
             for obj in r["stories"]:
