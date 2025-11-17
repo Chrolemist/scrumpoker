@@ -1,4 +1,5 @@
 import json, time, threading, uuid
+import shutil
 from html import escape
 from pathlib import Path
 import statistics
@@ -7,22 +8,47 @@ from streamlit_autorefresh import st_autorefresh
 
 ROOMS_LOCK = threading.Lock()
 ROOMS_FILE = Path("rooms_state.json")
+BACKUP_FILE = Path("rooms_state.backup.json")
 
 DEFAULT_TSHIRT = ["XS", "S", "M", "L", "XL"]
 DEFAULT_SCALE = {"XS": 1, "S": 2, "M": 3, "L": 5, "XL": 8}
 
 def load_rooms():
-    if not ROOMS_FILE.exists():
-        return {}
-    try:
-        with ROOMS_FILE.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
+    """Load rooms with a fallback to backup if the main file is missing, empty or unreadable."""
+    def _read(p: Path):
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception:
+            pass
         return {}
 
+    rooms = _read(ROOMS_FILE) if ROOMS_FILE.exists() else {}
+    if rooms:
+        return rooms
+    # fallback to backup if available
+    if BACKUP_FILE.exists():
+        backup = _read(BACKUP_FILE)
+        if backup:
+            return backup
+    return {}
+
 def save_rooms(rooms):
-    with ROOMS_FILE.open("w", encoding="utf-8") as f:
+    """Safely write rooms, keeping a backup of the previous state and using atomic replace."""
+    # write to temp file first
+    tmp = ROOMS_FILE.with_suffix(".json.tmp")
+    with tmp.open("w", encoding="utf-8") as f:
         json.dump(rooms, f, ensure_ascii=False, indent=2)
+    # rotate backup
+    try:
+        if ROOMS_FILE.exists():
+            shutil.copyfile(ROOMS_FILE, BACKUP_FILE)
+    except Exception:
+        pass
+    # atomic replace
+    tmp.replace(ROOMS_FILE)
 
 def init_room(rooms, room_code):
     if room_code not in rooms:
@@ -335,6 +361,21 @@ with scale_section:
             if new_scale:
                 update_room(room_code, lambda r: r.update(scale=new_scale))
                 room = get_room(room_code)
+
+# Backup/restore admin
+with st.sidebar.expander("Admin"):
+    st.caption("Säkerhetskopia av rum och user stories")
+    if BACKUP_FILE.exists():
+        if st.button("Återställ senaste backup"):
+            try:
+                # Restore backup atomically
+                shutil.copyfile(BACKUP_FILE, ROOMS_FILE)
+                st.success("Backup återställd. Laddar om…")
+                st.rerun()
+            except Exception:
+                st.error("Misslyckades att återställa backup.")
+    else:
+        st.caption("Ingen backup hittades ännu.")
 
 # Timer controls (facilitator)
 with st.sidebar.expander("Timer"):
