@@ -353,6 +353,10 @@ if player_name:
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
 
+# Control which story expander is open
+if "expanded_story_id" not in st.session_state:
+    st.session_state["expanded_story_id"] = active_sid
+
 # New story button (no title required)
 if st.button("+ Ny story"):
     def add_story(r):
@@ -394,7 +398,7 @@ for idx, story in enumerate(stories):
     if is_active:
         st.markdown('<div class="active-expander-marker"></div>', unsafe_allow_html=True)
 
-    with st.expander(story_title, expanded=is_active):
+    with st.expander(story_title, expanded=(sid == st.session_state.get("expanded_story_id", active_sid))):
         col1, col2, col3 = st.columns([4, 1, 1])
         
         with col1:
@@ -405,6 +409,16 @@ for idx, story in enumerate(stories):
                 height=100,
                 placeholder="Beskriv user story...",
             )
+            # Save button saves the text and collapses the expander
+            if st.button("Spara", key=f"save_{sid}", use_container_width=True):
+                def save_text(r, sid=sid, text_val=text_val):
+                    for obj in r["stories"]:
+                        if obj["id"] == sid:
+                            obj["text"] = text_val
+                            break
+                update_room(room_code, save_text)
+                st.session_state["expanded_story_id"] = None
+                st.rerun()
         
         with col2:
             if is_active:
@@ -413,6 +427,7 @@ for idx, story in enumerate(stories):
                 if st.button("Välj för röstning", key=f"select_{sid}", use_container_width=True):
                     update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
                     st.session_state["active_story_id"] = sid
+                    st.session_state["expanded_story_id"] = sid
                     st.rerun()
         
         with col3:
