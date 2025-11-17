@@ -393,40 +393,37 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
     if st.session_state.get("_clear_chat_input", False):
         room = get_room(room_code)
     # Hämta rumschat först
-    room_chat = (room.get("chat") or [])[-200:]
+    room_chat = list(room.get("chat") or [])
     # Lokalt klient-historik (meddelanden skickade i denna session)
     local_key = f"chat_history_{room_code}"
-    local_hist = st.session_state.get(local_key, [])
-    # Om vi nyligen skickade ett meddelande kan en snapshot finnas i session_state;
-    # slå ihop snapshot med rumschat (lägg till eventuella saknade meddelanden)
-    snap = st.session_state.get("_last_sent_chat_snapshot")
-    if snap:
-        # bygg en unik lista baserat på (ts, name, text)
-        seen = {(m.get("ts"), m.get("name"), m.get("text")) for m in room_chat}
-        merged = list(room_chat)
-        # Lägg till lokal historik först (vid behov)
-        for s in local_hist:
-            key = (s.get("ts"), s.get("name"), s.get("text"))
-            if key not in seen:
-                merged.append(s)
-                seen.add(key)
-        # Lägg sedan till snapshot-poster om de saknas
-        for s in snap:
-            key = (s.get("ts"), s.get("name"), s.get("text"))
-            if key not in seen:
-                merged.append(s)
-                seen.add(key)
-        msgs = merged[-200:]
-    else:
-        # slå ihop med lokal historik om servern saknar dem
-        seen = {(m.get("ts"), m.get("name"), m.get("text")) for m in room_chat}
-        merged = list(room_chat)
-        for s in local_hist:
-            key = (s.get("ts"), s.get("name"), s.get("text"))
-            if key not in seen:
-                merged.append(s)
-                seen.add(key)
-        msgs = merged[-200:]
+    local_hist = list(st.session_state.get(local_key, []))
+    # Snapshot från senast skickade
+    snap = list(st.session_state.get("_last_sent_chat_snapshot") or [])
+
+    # Combined key per room - beständig ackumulering i session_state
+    combined_key = f"chat_combined_{room_code}"
+    combined = st.session_state.get(combined_key, [])
+
+    # Candidates: server chat, local history, snapshot
+    candidates = room_chat + local_hist + snap
+    # Sortera kandidater efter timestamp så order blir kronologisk
+    candidates_sorted = sorted(candidates, key=lambda x: float(x.get("ts") or 0))
+
+    # Bygg unik lista utan dubbletter och bevara tidigare combined där möjligt
+    seen = {(m.get("ts"), m.get("name"), m.get("text")) for m in combined}
+    new_combined = list(combined)
+    for c in candidates_sorted:
+        key = (c.get("ts"), c.get("name"), c.get("text"))
+        if key not in seen:
+            new_combined.append(c)
+            seen.add(key)
+
+    # Trim till senaste 500 för sessionen
+    if len(new_combined) > 500:
+        new_combined = new_combined[-500:]
+
+    st.session_state[combined_key] = new_combined
+    msgs = new_combined[-200:]
     me = (st.session_state.get("player_name") or "").strip()
 
     # Messages list
