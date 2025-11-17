@@ -766,7 +766,7 @@ with card_container:
     # Clean out expired pings (older than 3s)
     def _clean_pings(r):
         now = time.time()
-        r["pings"] = {k: v for k, v in (r.get("pings", {}) or {}).items() if now - float(v) < 3}
+        r["pings"] = {k: v for k, v in (r.get("pings", {}) or {}).items() if now - float(v) < 1}
     update_room(room_code, _clean_pings)
     room = get_room(room_code)
     pings = room.get("pings", {})
@@ -786,7 +786,7 @@ with card_container:
                     is_pinged = False
                     try:
                         ts = float(pings.get(p, 0))
-                        is_pinged = (time.time() - ts) < 3
+                        is_pinged = (time.time() - ts) < 1
                     except Exception:
                         is_pinged = False
                     base_cls = "card flip" if revealed and has_vote else "card"
