@@ -141,10 +141,13 @@ body { overflow-x: hidden; }
 .warning { color:#ffcc00; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI */
-.story-card { padding:0.6rem 0.8rem; background:#1B1F29; border-radius:10px; border:2px solid #2b2f3b; position:relative; margin-bottom: 8px; }
-.story-card:hover { border-color:#6C5DD3; box-shadow:0 0 8px rgba(108,93,211,.4); }
-.story-card.active { animation: rgbBorder 2s linear infinite; border-color: transparent; }
+.story-container { padding:0.6rem 0.8rem; background:#1B1F29; border-radius:10px; border:2px solid #2b2f3b; margin-bottom: 10px; }
+.story-container:hover { border-color:#6C5DD3; box-shadow:0 0 8px rgba(108,93,211,.4); }
+.story-active { padding:0.6rem 0.8rem; background:#1B1F29; border-radius:10px; border:2px solid transparent; margin-bottom: 10px; animation: rgbBorder 2s linear infinite; }
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
+/* Hide default streamlit padding */
+.story-container > div, .story-active > div { margin-top: 0 !important; margin-bottom: 0 !important; }
+.story-container .stTextInput > div > div, .story-active .stTextInput > div > div { margin-bottom: 0 !important; }
 </style>
 """
 
@@ -306,81 +309,86 @@ if active_obj and not (active_obj.get("text", "").strip()):
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
 
-# Inline editable stories – varje kort hanteras separat (ingen tom wrapper ovanför)
+# Inline editable stories – varje kort är en container med RGB-ram
 
 for idx, s in enumerate(stories):
     sid = s["id"]
-    cls = "story-card active" if sid == active_sid else "story-card"
-    with st.container():
-        st.markdown(f"<div class='{cls}'>", unsafe_allow_html=True)
-        cols = st.columns([7,1,1,1,1])
-        # Compact text field with autosave
-        text_val = cols[0].text_input("", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="collapsed", placeholder="Beskriv user story...")
-        if text_val != s.get("text", ""):
-            def update_text(r):
-                for obj in r["stories"]:
-                    if obj["id"] == sid:
-                        obj["text"] = text_val
-                        break
-                # auto-select when edited
-                r["active_story_id"] = sid
-            update_room(room_code, update_text)
-            room = get_room(room_code)
-            stories = room.get("stories", [])
-            active_sid = room.get("active_story_id")
+    is_active = sid == active_sid
+    
+    # Create bordered container using markdown wrapper
+    container_class = "story-active" if is_active else "story-container"
+    st.markdown(f'<div class="{container_class}">', unsafe_allow_html=True)
+    
+    cols = st.columns([7,1,1,1,1])
+    
+    # Compact text field with autosave
+    text_val = cols[0].text_input("", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="collapsed", placeholder="Beskriv user story...")
+    if text_val != s.get("text", ""):
+        def update_text(r):
+            for obj in r["stories"]:
+                if obj["id"] == sid:
+                    obj["text"] = text_val
+                    break
+            # auto-select when edited
+            r["active_story_id"] = sid
+        update_room(room_code, update_text)
+        room = get_room(room_code)
+        stories = room.get("stories", [])
+        active_sid = room.get("active_story_id")
 
-        # Select button
-        if cols[1].button("Välj", key=f"select_{sid}"):
-            update_room(room_code, lambda r: r.update(active_story_id=sid))
-            room = get_room(room_code)
-            active_sid = room.get("active_story_id")
+    # Select button
+    if cols[1].button("Välj", key=f"select_{sid}"):
+        update_room(room_code, lambda r: r.update(active_story_id=sid))
+        room = get_room(room_code)
+        active_sid = room.get("active_story_id")
 
-        # Move up
-        up_disabled = idx == 0
-        if cols[2].button("↑", key=f"up_{sid}") and not up_disabled:
-            def move_up(r):
-                arr = r["stories"]
-                i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
-                if i and i > 0:
-                    arr[i-1], arr[i] = arr[i], arr[i-1]
-            update_room(room_code, move_up)
-            room = get_room(room_code)
-            stories = room.get("stories", [])
+    # Move up
+    up_disabled = idx == 0
+    if cols[2].button("↑", key=f"up_{sid}", disabled=up_disabled):
+        def move_up(r):
+            arr = r["stories"]
+            i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
+            if i and i > 0:
+                arr[i-1], arr[i] = arr[i], arr[i-1]
+        update_room(room_code, move_up)
+        room = get_room(room_code)
+        stories = room.get("stories", [])
 
-        # Move down
-        down_disabled = idx >= len(stories) - 1
-        if cols[3].button("↓", key=f"down_{sid}") and not down_disabled:
-            def move_down(r):
-                arr = r["stories"]
-                i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
-                if i is not None and i < len(arr) - 1:
-                    arr[i+1], arr[i] = arr[i], arr[i+1]
-            update_room(room_code, move_down)
-            room = get_room(room_code)
-            stories = room.get("stories", [])
+    # Move down
+    down_disabled = idx >= len(stories) - 1
+    if cols[3].button("↓", key=f"down_{sid}", disabled=down_disabled):
+        def move_down(r):
+            arr = r["stories"]
+            i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
+            if i is not None and i < len(arr) - 1:
+                arr[i+1], arr[i] = arr[i], arr[i-1]
+        update_room(room_code, move_down)
+        room = get_room(room_code)
+        stories = room.get("stories", [])
 
-        # Delete
-        if cols[4].button("✖", key=f"del_{sid}"):
-            def delete_story(r):
-                r["stories"] = [o for o in r["stories"] if o["id"] != sid]
-                # remove votes and revealed entries
-                r.get("votes", {}).pop(sid, None)
-                r.get("revealed_for", {}).pop(sid, None)
-                # adjust active id
-                if r.get("active_story_id") == sid:
-                    if r["stories"]:
-                        r["active_story_id"] = r["stories"][0]["id"]
-                    else:
-                        new_sid = uuid.uuid4().hex[:8]
-                        r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
-                        r["votes"].setdefault(new_sid, {})
-                        r["revealed_for"].setdefault(new_sid, False)
-                        r["active_story_id"] = new_sid
-            update_room(room_code, delete_story)
-            room = get_room(room_code)
-            stories = room.get("stories", [])
-            active_sid = room.get("active_story_id")
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Delete
+    if cols[4].button("✖", key=f"del_{sid}"):
+        def delete_story(r):
+            r["stories"] = [o for o in r["stories"] if o["id"] != sid]
+            # remove votes and revealed entries
+            r.get("votes", {}).pop(sid, None)
+            r.get("revealed_for", {}).pop(sid, None)
+            # adjust active id
+            if r.get("active_story_id") == sid:
+                if r["stories"]:
+                    r["active_story_id"] = r["stories"][0]["id"]
+                else:
+                    new_sid = uuid.uuid4().hex[:8]
+                    r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
+                    r["votes"].setdefault(new_sid, {})
+                    r["revealed_for"].setdefault(new_sid, False)
+                    r["active_story_id"] = new_sid
+        update_room(room_code, delete_story)
+        room = get_room(room_code)
+        stories = room.get("stories", [])
+        active_sid = room.get("active_story_id")
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # No manual refresh needed; auto-refresh is enabled.
