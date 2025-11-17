@@ -803,7 +803,7 @@ with card_container:
                     )
                     with cols[j]:
                         st.markdown(card_html, unsafe_allow_html=True)
-                        if st.button("🔔", key=f"ping_{p}", help=f"Pingga {p}", use_container_width=True):
+                        if st.button("🔔", key=f"ping_{p}", help=f"Pingga {p}", use_container_width=False):
                             def _set_ping(r, who=p):
                                 r.setdefault("pings", {})[who] = time.time()
                             update_room(room_code, _set_ping)
