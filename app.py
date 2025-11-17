@@ -287,13 +287,24 @@ if st.button("+ Ny story"):
     def add_story(r):
         sid = uuid.uuid4().hex[:8]
         r["stories"].append({"id": sid, "text": "", "created": time.time()})
-        r["active_story_id"] = sid
         r["votes"].setdefault(sid, {})
         r["revealed_for"].setdefault(sid, False)
     update_room(room_code, add_story)
     room = get_room(room_code)
     stories = room.get("stories", [])
     active_sid = room.get("active_story_id")
+
+# Om aktiv story är tom och det finns en icke-tom, välj en med text
+stories = room.get("stories", [])
+active_sid = room.get("active_story_id")
+active_obj = next((s for s in stories if s["id"] == active_sid), None)
+if active_obj and not (active_obj.get("text", "").strip()):
+    non_empty = next((s for s in stories if s.get("text", "").strip()), None)
+    if non_empty and non_empty["id"] != active_sid:
+        update_room(room_code, lambda r: r.update(active_story_id=non_empty["id"]))
+        room = get_room(room_code)
+        stories = room.get("stories", [])
+        active_sid = room.get("active_story_id")
 
 # Inline editable stories – varje kort hanteras separat (ingen tom wrapper ovanför)
 
