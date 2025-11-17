@@ -151,7 +151,7 @@ body { overflow-x: hidden; }
 }
 
 /* Active story expander with RGB border */
-.active-story-wrapper div[data-testid="stExpander"] {
+.active-expander-marker + div[data-testid="stExpander"] {
     border: 2px solid #6C5DD3;
     border-radius: 8px;
     padding: 4px;
@@ -368,10 +368,10 @@ for idx, story in enumerate(stories):
     display_text = raw_text[:50] + "..." if len(raw_text) > 50 else raw_text
     story_title = display_text or f"User Story {idx+1}"
     
-    # Add CSS wrapper class for active story RGB border
+    # Marker element to style the next expander via CSS
     if is_active:
-        st.markdown('<div class="active-story-wrapper">', unsafe_allow_html=True)
-    
+        st.markdown('<div class="active-expander-marker"></div>', unsafe_allow_html=True)
+
     with st.expander(story_title, expanded=False):
         col1, col2, col3 = st.columns([4, 1, 1])
         
@@ -418,9 +418,7 @@ for idx, story in enumerate(stories):
                 r["active_story_id"] = sid  # Sätt som aktiv när man redigerar
             update_room(room_code, update_text)
     
-    # Close CSS wrapper for active story
-    if is_active:
-        st.markdown('</div>', unsafe_allow_html=True)
+    # No closing needed; marker styles the immediate next expander
 
 # No manual refresh needed; auto-refresh is enabled.
 
