@@ -142,33 +142,35 @@ body { overflow-x: hidden; }
 .consensus { color:#7dff00; font-weight:600; }
 .warning { color:#ffcc00; }
 .timer { font-size:1.2rem; font-weight:600; }
-/* Stories UI – utan :has, fungerar i alla moderna browsers */
-@keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
-.story-card-wrapper {
-    background:#1B1F29;
-    border:2px solid #2b2f3b;
-    border-radius:14px;
-    padding:0.7rem 0.9rem;
-    margin-bottom:0.75rem;
+/* Stories UI – tabell/lista utan extra kort */
+@keyframes rgbBorder { 0% { box-shadow:0 0 0 1px #ff004c; } 33% { box-shadow:0 0 0 1px #00e1ff; } 66% { box-shadow:0 0 0 1px #7dff00; } 100% { box-shadow:0 0 0 1px #ff004c; } }
+.story-table-header {
+    font-size:0.85rem;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    color:#9ca3af;
+    margin-bottom:0.25rem;
 }
-.story-card-wrapper.active-story {
-    border-color:transparent;
-    animation: rgbBorder 2s linear infinite;
+.story-row {
+    border-radius:8px;
+    padding:0.35rem 0.5rem;
+    margin-bottom:0.25rem;
 }
-.story-card-wrapper.empty textarea {
-    opacity:0.65;
-    font-style:italic;
+.story-row.active-story {
+    background:rgba(108,93,211,0.16);
+    box-shadow:0 0 0 1px #6C5DD3, 0 0 10px rgba(108,93,211,0.6);
 }
-.story-card-wrapper textarea {
+.story-row textarea {
     background:#11131a;
     border:1px solid #2b2f3b;
-    border-radius:10px;
+    border-radius:6px;
     color:#f0f0f4;
-    min-height:100px;
+    min-height:70px;
 }
-.story-card-wrapper button {
+.story-row button {
     width:100%;
-    height:40px;
+    height:32px;
+    font-size:0.8rem;
 }
 </style>
 """
@@ -348,26 +350,33 @@ if active_obj and not (active_obj.get("text", "").strip()):
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
 
-# Stories display – cards med RGB highlight och inline-editing
+# Stories display – tabelliknande lista
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
+
+header_cols = st.columns([8, 1, 1])
+with header_cols[0]:
+    st.markdown("<div class='story-table-header'>User story</div>", unsafe_allow_html=True)
+with header_cols[1]:
+    st.markdown("<div class='story-table-header'>Välj</div>", unsafe_allow_html=True)
+with header_cols[2]:
+    st.markdown("<div class='story-table-header'>Ta bort</div>", unsafe_allow_html=True)
+
 for idx, s in enumerate(stories):
     sid = s["id"]
     is_active = sid == active_sid
     raw_text = s.get("text", "")
-    wrapper_classes = ["story-card-wrapper"]
+    row_classes = ["story-row"]
     if is_active:
-        wrapper_classes.append("active-story")
-    if not raw_text.strip():
-        wrapper_classes.append("empty")
+        row_classes.append("active-story")
 
     with st.container():
         st.markdown(
-            f"<div class='{' '.join(wrapper_classes)}'>",
+            f"<div class='{' '.join(row_classes)}'>",
             unsafe_allow_html=True,
         )
 
-        cols = st.columns([7,1,1,1,1])
+        cols = st.columns([8, 1, 1])
 
         # Inline text area editing
         text_val = cols[0].text_area(
@@ -375,19 +384,17 @@ for idx, s in enumerate(stories):
             value=raw_text,
             key=f"story_text_{sid}",
             label_visibility="collapsed",
-            height=120,
+            height=90,
             placeholder="Beskriv user story...",
         )
 
         if cols[1].button("Välj", key=f"select_{sid}"):
-            # uppdatera aktiv story både i rummet och lokalt så RGB-rammen syns direkt
             update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
             st.session_state["active_story_id"] = sid
             room = get_room(room_code)
             active_sid = room.get("active_story_id")
 
-        # ta bort pilarna, behåll bara delete-knappen längst till höger
-        if cols[4].button("✖", key=f"del_{sid}"):
+        if cols[2].button("✖", key=f"del_{sid}"):
             def delete_story(r, sid=sid):
                 r["stories"] = [o for o in r["stories"] if o["id"] != sid]
                 r.get("votes", {}).pop(sid, None)
@@ -406,6 +413,8 @@ for idx, s in enumerate(stories):
             stories = room.get("stories", [])
             active_sid = room.get("active_story_id")
 
+        st.markdown("</div>", unsafe_allow_html=True)
+
     if text_val != raw_text:
         def update_text(r, sid=sid, text_val=text_val):
             for obj in r["stories"]:
@@ -414,13 +423,10 @@ for idx, s in enumerate(stories):
                     break
             r["active_story_id"] = sid
         update_room(room_code, update_text)
-        # uppdatera lokal active_story_id direkt för tydlig RGB-markering
         st.session_state["active_story_id"] = sid
         room = get_room(room_code)
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 # No manual refresh needed; auto-refresh is enabled.
 
