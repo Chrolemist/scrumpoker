@@ -691,9 +691,6 @@ for idx, story in enumerate(stories):
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
-st.markdown("<br>", unsafe_allow_html=True)
 st.divider()
 # Timer display
 room = get_room(room_code)  # refresh
