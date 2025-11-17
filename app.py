@@ -1,151 +1,24 @@
-import json, time, threading, uuid
-import sqlite3
-import os
-import shutil
+
+import time, uuid
 from html import escape
-from pathlib import Path
 import statistics
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-ROOMS_LOCK = threading.Lock()
-ROOMS_FILE = Path("rooms_state.json")
-BACKUP_FILE = Path("rooms_state.backup.json")
-DB_FILE = Path("rooms_state.db")
-
-def _db_init():
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        with conn:
-            conn.execute(
-                "CREATE TABLE IF NOT EXISTS rooms (room_code TEXT PRIMARY KEY, data TEXT NOT NULL)"
-            )
-        conn.close()
-    except Exception:
-        pass
+# All data lagras i minnet under sessionen
+ROOMS = {}
 
 DEFAULT_TSHIRT = ["XS", "S", "M", "L", "XL"]
 DEFAULT_SCALE = {"XS": 1, "S": 2, "M": 3, "L": 5, "XL": 8}
 
 def load_rooms():
-    """Load rooms from SQLite if present; fallback to JSON/backup and seed DB if needed."""
-    def _read_json(p: Path):
-        try:
-            with p.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-                if isinstance(data, dict):
-                    return data
-        except Exception:
-            pass
-        return {}
-
-    # Prefer DB
-    rooms: dict = {}
-    if DB_FILE.exists():
-        try:
-            _db_init()
-            conn = sqlite3.connect(DB_FILE)
-            cur = conn.execute("SELECT room_code, data FROM rooms")
-            for code, data in cur.fetchall():
-                try:
-                    rooms[code] = json.loads(data)
-                except Exception:
-                    continue
-            conn.close()
-        except Exception:
-            rooms = {}
-    if rooms:
-        return rooms
-
-    # Fallback to JSON main, then backup
-    rooms = _read_json(ROOMS_FILE) if ROOMS_FILE.exists() else {}
-    if not rooms and BACKUP_FILE.exists():
-        rooms = _read_json(BACKUP_FILE)
-
-    # Seed DB with what we have
-    if rooms:
-        try:
-            _db_init()
-            conn = sqlite3.connect(DB_FILE)
-            with conn:
-                for code, data in rooms.items():
-                    conn.execute(
-                        "INSERT OR REPLACE INTO rooms(room_code, data) VALUES(?, ?)",
-                        (code, json.dumps(data, ensure_ascii=False)),
-                    )
-            conn.close()
-        except Exception:
-            pass
-    return rooms
+    """Returnerar alla rum från minnet."""
+    return ROOMS
 
 def save_rooms(rooms):
-    """Safely write rooms, keeping a backup of the previous state and using atomic replace.
-    Uses a unique temp file per write and fsync to reduce cross-process races.
-    """
-    # ensure parent directory exists
-    ROOMS_FILE.parent.mkdir(parents=True, exist_ok=True)
-
-    # write to a unique temp file first
-    tmp = ROOMS_FILE.with_name(f"{ROOMS_FILE.name}.{uuid.uuid4().hex}.tmp")
-    try:
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(rooms, f, ensure_ascii=False, indent=2)
-            try:
-                f.flush()
-                os.fsync(f.fileno())
-            except Exception:
-                pass
-    except Exception:
-        # if even tmp write fails, try direct write as last resort
-        with ROOMS_FILE.open("w", encoding="utf-8") as f:
-            json.dump(rooms, f, ensure_ascii=False, indent=2)
-        return
-
-    # rotate backup (best-effort)
-    try:
-        if ROOMS_FILE.exists():
-            shutil.copyfile(ROOMS_FILE, BACKUP_FILE)
-    except Exception:
-        pass
-
-    # atomic replace or best-effort fallback (JSON)
-    try:
-        os.replace(tmp, ROOMS_FILE)
-    except FileNotFoundError:
-        # source missing (rare race) — write directly
-        with ROOMS_FILE.open("w", encoding="utf-8") as f:
-            json.dump(rooms, f, ensure_ascii=False, indent=2)
-    except Exception:
-        try:
-            shutil.move(str(tmp), str(ROOMS_FILE))
-        except Exception:
-            # as last resort, attempt direct write
-            with ROOMS_FILE.open("w", encoding="utf-8") as f:
-                json.dump(rooms, f, ensure_ascii=False, indent=2)
-
-    # Also persist to SQLite per-room for durability
-    try:
-        _db_init()
-        conn = sqlite3.connect(DB_FILE)
-        with conn:
-            # upsert all rooms
-            for code, data in rooms.items():
-                conn.execute(
-                    "INSERT OR REPLACE INTO rooms(room_code, data) VALUES(?, ?)",
-                    (code, json.dumps(data, ensure_ascii=False)),
-                )
-            # remove deleted rooms
-            if rooms:
-                placeholders = ",".join(["?"] * len(rooms))
-                conn.execute(
-                    f"DELETE FROM rooms WHERE room_code NOT IN ({placeholders})",
-                    list(rooms.keys()),
-                )
-            else:
-                conn.execute("DELETE FROM rooms")
-        conn.close()
-    except Exception:
-        pass
+    """Sparar rum till minnet (ingen disk)."""
+    global ROOMS
+    ROOMS = rooms
 
 def init_room(rooms, room_code):
     if room_code not in rooms:
@@ -225,20 +98,17 @@ def migrate_room(room: dict) -> bool:
     return changed
 
 def update_room(room_code, mutate_fn):
-    with ROOMS_LOCK:
-        rooms = load_rooms()
-        init_room(rooms, room_code)
-        # migrate before mutation
-        if migrate_room(rooms[room_code]):
-            pass
-        mutate_fn(rooms[room_code])
-        # bumpa en enkel versionsräknare vid varje ändring
-        rooms[room_code]["last_update"] = time.time()
-        # Ensure players is a unique list
-        if isinstance(rooms[room_code].get("players"), set):
-            rooms[room_code]["players"] = list(rooms[room_code]["players"])
-        rooms[room_code]["players"] = list(dict.fromkeys(rooms[room_code]["players"]))
-        save_rooms(rooms)
+    rooms = load_rooms()
+    init_room(rooms, room_code)
+    # migrate before mutation
+    if migrate_room(rooms[room_code]):
+        pass
+    mutate_fn(rooms[room_code])
+    rooms[room_code]["last_update"] = time.time()
+    if isinstance(rooms[room_code].get("players"), set):
+        rooms[room_code]["players"] = list(rooms[room_code]["players"])
+    rooms[room_code]["players"] = list(dict.fromkeys(rooms[room_code]["players"]))
+    save_rooms(rooms)
 
 def get_room(room_code):
     rooms = load_rooms()
@@ -472,20 +342,7 @@ with scale_section:
                 update_room(room_code, lambda r: r.update(scale=new_scale))
                 room = get_room(room_code)
 
-# Backup/restore admin
-with st.sidebar.expander("Admin"):
-    st.caption("Säkerhetskopia av rum och user stories")
-    if BACKUP_FILE.exists():
-        if st.button("Återställ senaste backup"):
-            try:
-                # Restore backup atomically
-                shutil.copyfile(BACKUP_FILE, ROOMS_FILE)
-                st.success("Backup återställd. Laddar om…")
-                st.rerun()
-            except Exception:
-                st.error("Misslyckades att återställa backup.")
-    else:
-        st.caption("Ingen backup hittades ännu.")
+
 
 # Timer controls (facilitator)
 with st.sidebar.expander("Timer"):
