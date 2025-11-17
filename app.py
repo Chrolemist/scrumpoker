@@ -315,18 +315,17 @@ for idx, s in enumerate(stories):
     sid = s["id"]
     is_active = sid == active_sid
     
-    # Apply RGB border via custom container class
-    if is_active:
-        border_style = "border: 2px solid transparent; animation: rgbBorder 2s linear infinite; border-radius: 8px; padding: 6px; margin-bottom: 6px; background: #1B1F29;"
-    else:
-        border_style = "border: 2px solid #2b2f3b; border-radius: 8px; padding: 6px; margin-bottom: 6px; background: #1B1F29;"
-    
-    st.markdown(f'<div style="{border_style}">', unsafe_allow_html=True)
-    
-    cols = st.columns([7,1,1,1,1])
-    
-    # Text input with autosave (no label, completely hidden)
-    text_val = cols[0].text_input("x", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="hidden", placeholder="Beskriv user story...")
+    # Wrap entire story in container with RGB border
+    with st.container():
+        if is_active:
+            st.markdown('<div style="border: 2px solid transparent; animation: rgbBorder 2s linear infinite; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #1B1F29;">', unsafe_allow_html=True)
+        else:
+            st.markdown('<div style="border: 2px solid #2b2f3b; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #1B1F29;">', unsafe_allow_html=True)
+        
+        cols = st.columns([7,1,1,1,1])
+        
+        # Text input with autosave (no label, completely hidden)
+        text_val = cols[0].text_input("x", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="hidden", placeholder="Beskriv user story...")
     if text_val != s.get("text", ""):
         def update_text(r):
             for obj in r["stories"]:
