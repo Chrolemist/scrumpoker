@@ -394,6 +394,9 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
         room = get_room(room_code)
     # Hämta rumschat först
     room_chat = (room.get("chat") or [])[-200:]
+    # Lokalt klient-historik (meddelanden skickade i denna session)
+    local_key = f"chat_history_{room_code}"
+    local_hist = st.session_state.get(local_key, [])
     # Om vi nyligen skickade ett meddelande kan en snapshot finnas i session_state;
     # slå ihop snapshot med rumschat (lägg till eventuella saknade meddelanden)
     snap = st.session_state.get("_last_sent_chat_snapshot")
@@ -401,6 +404,13 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
         # bygg en unik lista baserat på (ts, name, text)
         seen = {(m.get("ts"), m.get("name"), m.get("text")) for m in room_chat}
         merged = list(room_chat)
+        # Lägg till lokal historik först (vid behov)
+        for s in local_hist:
+            key = (s.get("ts"), s.get("name"), s.get("text"))
+            if key not in seen:
+                merged.append(s)
+                seen.add(key)
+        # Lägg sedan till snapshot-poster om de saknas
         for s in snap:
             key = (s.get("ts"), s.get("name"), s.get("text"))
             if key not in seen:
@@ -408,7 +418,15 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
                 seen.add(key)
         msgs = merged[-200:]
     else:
-        msgs = room_chat
+        # slå ihop med lokal historik om servern saknar dem
+        seen = {(m.get("ts"), m.get("name"), m.get("text")) for m in room_chat}
+        merged = list(room_chat)
+        for s in local_hist:
+            key = (s.get("ts"), s.get("name"), s.get("text"))
+            if key not in seen:
+                merged.append(s)
+                seen.add(key)
+        msgs = merged[-200:]
     me = (st.session_state.get("player_name") or "").strip()
 
     # Messages list
@@ -472,6 +490,12 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
                 # Fetch room immediately and save a persistent snapshot in session_state
                 _r2 = get_room(room_code)
                 st.session_state["_last_sent_chat_snapshot"] = _r2.get("chat", [])[-20:]
+                # Also append the new message to a per-session local chat history so
+                # multiple messages from this client are shown even if server chat lags.
+                local_key = f"chat_history_{room_code}"
+                hist = st.session_state.setdefault(local_key, [])
+                hist.append({"name": me, "text": msg, "ts": time.time()})
+                st.session_state[local_key] = hist
                 st.rerun()
 
     # If debug enabled, show raw chat data or the last sent snapshot so it doesn't blink
