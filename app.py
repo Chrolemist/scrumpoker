@@ -432,8 +432,11 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
         emoji_options = ["—", "😀", "😅", "😂", "🙌", "👍", "🎉", "❤️", "🔥", "🙏", "🚀", "🤔"]
         st.selectbox("Emoji", options=emoji_options, index=0, key="chat_emoji_select", label_visibility="collapsed", on_change=_chat_append_emoji)
 
+    # Debug checkbox to help troubleshoot chat updates
+    chat_debug = st.checkbox("Visa chat-debug (rå data)", value=False, key="chat_debug")
+
     # Input and send (Enter submits the form)
-    with st.form(key="chat_form", clear_on_submit=False):
+    with st.form(key="chat_form", clear_on_submit=True):
         chat_text = st.text_input("Skriv ett meddelande", key="chat_input", placeholder="Skriv ett meddelande…")
         sent = st.form_submit_button("Skicka")
         if sent:
@@ -450,8 +453,12 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
                 update_room(room_code, append_msg)
                 # Expand chat and clear input on next run so user sees the message
                 st.session_state["chat_expanded"] = True
-                st.session_state["_clear_chat_input"] = True
                 st.rerun()
+
+    # If debug enabled, show raw chat data for troubleshooting
+    if st.session_state.get("chat_debug"):
+        st.markdown("**DEBUG: senaste meddelanden (rå data)**")
+        st.write(room.get("chat", [])[-20:])
 
 # --- Main content ---
 # Ensure player registered (lägg alltid till namnet, även anonymt)
