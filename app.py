@@ -1,4 +1,5 @@
 import json, time, threading, uuid
+from html import escape
 from pathlib import Path
 import statistics
 import streamlit as st
@@ -43,6 +44,8 @@ def init_room(rooms, room_code):
                 "duration": 0,
             },
             "players": [],
+            # chat: list of {name, text, ts}
+            "chat": [],
             "last_update": time.time(),
         }
 
@@ -75,6 +78,7 @@ def migrate_room(room: dict) -> bool:
     room.setdefault("votes", {})
     room.setdefault("revealed_for", {})
     room.setdefault("players", [])
+    room.setdefault("chat", [])
     # Ensure active story exists
     if not room["stories"]:
         sid = uuid.uuid4().hex[:8]
@@ -171,6 +175,15 @@ body { overflow-x: hidden; }
     text-overflow: unset !important;
     word-break: break-word;
 }
+
+/* Sidebar chat styles */
+.sidebar-chat-box { max-height: 260px; overflow-y: auto; padding-right: 6px; margin-bottom: 8px; }
+.chat-msg { margin: 8px 0; }
+.chat-name { font-size: 0.75rem; color: #9aa0b3; margin-bottom: 2px; }
+.chat-row { display: block; }
+.chat-row.right { text-align: right; }
+.chat-bubble { display: inline-block; padding: 8px 10px; border-radius: 12px; background: #2b2f3b; color: #e6e8f0; box-shadow: 0 0 6px rgba(0,0,0,0.2); max-width: 100%; word-wrap: break-word; }
+.chat-bubble.mine { background: #6C5DD3; color: #ffffff; }
 
 /* Active select button RGB glow */
 
@@ -325,6 +338,48 @@ with st.sidebar.expander("Timer"):
         update_room(room_code, lambda r: r.update(timer={"end": end_time, "duration": duration}))
     if col_t2.button("Stoppa timer"):
         update_room(room_code, lambda r: r.update(timer={"end": None, "duration": 0}))
+
+# --- Chat (sidebar, bottom) ---
+with st.sidebar.expander("Chat", expanded=False):
+    room = get_room(room_code)  # refresh to include any new messages
+    msgs = (room.get("chat") or [])[-200:]
+    me = (st.session_state.get("player_name") or "").strip()
+
+    # Messages list
+    chat_html = ["<div class='sidebar-chat-box'>"]
+    for m in msgs:
+        name = (m.get("name") or "Anonym").strip() or "Anonym"
+        text = escape(str(m.get("text", "")))
+        mine = (me != "" and name == me)
+        align_cls = "right" if mine else "left"
+        bubble_cls = "chat-bubble mine" if mine else "chat-bubble"
+        chat_html.append(
+            f"<div class='chat-msg chat-row {align_cls}'>"
+            f"<div class='chat-name'>{escape(name)}</div>"
+            f"<div class='{bubble_cls}'>{text}</div>"
+            f"</div>"
+        )
+    chat_html.append("</div>")
+    st.markdown("\n".join(chat_html), unsafe_allow_html=True)
+
+    # Send form
+    with st.form(key="chat_form", enter_to_submit=True):
+        chat_text = st.text_input("Skriv ett meddelande", key="chat_input", placeholder="Skriv ett meddelande…")
+        sent = st.form_submit_button("Skicka")
+        if sent:
+            msg = (chat_text or "").strip()
+            if not me:
+                st.warning("Ange ditt namn i sidopanelen innan du chattar.")
+            elif msg:
+                def append_msg(r):
+                    lst = r.setdefault("chat", [])
+                    lst.append({"name": me, "text": msg, "ts": time.time()})
+                    # Trim to last 500 msgs to keep file small
+                    if len(lst) > 500:
+                        del lst[:-500]
+                update_room(room_code, append_msg)
+                st.session_state["chat_input"] = ""
+                st.rerun()
 
 # Reveal / reset controls
 with st.sidebar.expander("Omröstning"):
