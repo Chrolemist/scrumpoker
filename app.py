@@ -705,40 +705,40 @@ with card_container:
     room = get_room(room_code)
     pings = room.get("pings", {})
 
-    card_grid_html = ["<div class='card-grid'>"]
-    for p in players_list:
-        has_vote = p in all_votes
-        val = all_votes.get(p, "?")
-        is_pinged = False
-        try:
-            ts = float(pings.get(p, 0))
-            is_pinged = (time.time() - ts) < 5
-        except Exception:
-            is_pinged = False
-        base_cls = "card flip" if revealed and has_vote else "card"
-        card_classes = (base_cls + (" pinged" if is_pinged else "")).strip()
-        display_name = escape(str(p))
-        name_class = "name long" if len(str(p)) > 12 else "name"
-        front_content = f"<span class='{name_class}'>{display_name}</span>"
-        back_content = val if revealed and has_vote else "?"
-        card_html = f"<div class='{card_classes}'><div class='card-inner'>" \
-                    f"<div class='card-face card-front'>{front_content}</div>" \
-                    f"<div class='card-face card-back'>{back_content}</div>" \
-                    f"</div></div>"
-        card_grid_html.append(card_html)
-    card_grid_html.append("</div>")
-    st.markdown("".join(card_grid_html), unsafe_allow_html=True)
-
-    # Ping controls aligned per player
+    # Render cards in rows of columns so ping button sits right below each card
     if players_list:
-        ping_cols = st.columns(len(players_list))
-        for idx, p in enumerate(players_list):
-            with ping_cols[idx]:
-                if st.button("🔔", key=f"ping_{p}", help=f"Pingga {p}"):
-                    def _set_ping(r, who=p):
-                        r.setdefault("pings", {})[who] = time.time()
-                    update_room(room_code, _set_ping)
-                    st.rerun()
+        cols_per_row = min(6, max(1, len(players_list)))
+        for i in range(0, len(players_list), cols_per_row):
+            row_players = players_list[i:i+cols_per_row]
+            cols = st.columns(len(row_players))
+            for j, p in enumerate(row_players):
+                with cols[j]:
+                    has_vote = p in all_votes
+                    val = all_votes.get(p, "?")
+                    is_pinged = False
+                    try:
+                        ts = float(pings.get(p, 0))
+                        is_pinged = (time.time() - ts) < 5
+                    except Exception:
+                        is_pinged = False
+                    base_cls = "card flip" if revealed and has_vote else "card"
+                    card_classes = (base_cls + (" pinged" if is_pinged else "")).strip()
+                    display_name = escape(str(p))
+                    name_class = "name long" if len(str(p)) > 12 else "name"
+                    front_content = f"<span class='{name_class}'>{display_name}</span>"
+                    back_content = val if revealed and has_vote else "?"
+                    card_html = (
+                        f"<div class='{card_classes}'><div class='card-inner'>"
+                        f"<div class='card-face card-front'>{front_content}</div>"
+                        f"<div class='card-face card-back'>{back_content}</div>"
+                        f"</div></div>"
+                    )
+                    st.markdown(card_html, unsafe_allow_html=True)
+                    if st.button("🔔", key=f"ping_{p}", help=f"Pingga {p}", use_container_width=True):
+                        def _set_ping(r, who=p):
+                            r.setdefault("pings", {})[who] = time.time()
+                        update_room(room_code, _set_ping)
+                        st.rerun()
 
 # Stats once revealed
 if revealed and all_votes:
