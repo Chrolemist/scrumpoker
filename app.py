@@ -150,16 +150,18 @@ body { overflow-x: hidden; }
     100% { border-color: #ff004c; box-shadow: 0 0 10px rgba(255,0,76,0.5); } 
 }
 
-/* Active story expander highlight – allow for wrappers between marker and expander */
-.active-story-badge {
-    display:inline-block;
+/* Active story badge inline in expander header using pseudo-element */
+.active-expander-marker ~ * [data-testid="stExpander"] summary::after {
+    content: "Aktiv";
+    display: inline-block;
+    margin-left: 8px;
     padding: 2px 8px;
     border-radius: 6px;
     border: 1px solid #6C5DD3;
     background: rgba(108,93,211,0.12);
-    color:#cfcff7;
+    color: #cfcff7;
     font-size: 0.8rem;
-    margin: 4px 0 6px 0;
+    line-height: 1.2;
 }
 
 /* Make expander titles wrap and show full text */
@@ -381,9 +383,9 @@ for idx, story in enumerate(stories):
     # Visa story som expanderbar sektion (som sidomenyn)
     story_title = (raw_text or "").strip() or f"User Story {idx+1}"
     
-    # Badge for active story and auto-expand when selected
+    # Insert a marker so CSS can add an inline badge in the header
     if is_active:
-        st.markdown('<span class="active-story-badge">Aktiv user story</span>', unsafe_allow_html=True)
+        st.markdown('<div class="active-expander-marker"></div>', unsafe_allow_html=True)
 
     with st.expander(story_title, expanded=is_active):
         col1, col2, col3 = st.columns([4, 1, 1])
