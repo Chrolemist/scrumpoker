@@ -142,13 +142,12 @@ body { overflow-x: hidden; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI */
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
-/* Aggressive removal of Streamlit default spacing */
-.stTextInput { margin-bottom: 0 !important; margin-top: 0 !important; }
-.stTextInput > div { margin-bottom: 0 !important; margin-top: 0 !important; }
-.stTextInput > label { margin-bottom: 0 !important; margin-top: 0 !important; display: none !important; }
-.stTextInput input { margin-bottom: 0 !important; margin-top: 0 !important; }
-.element-container { margin-bottom: 0 !important; margin-top: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
-.row-widget { margin-bottom: 0 !important; margin-top: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+.story-row { background:#1B1F29; border:2px solid #2b2f3b; border-radius:12px; padding:0.35rem 0.5rem; margin-bottom:0.7rem; }
+.story-row.active { border-color:transparent; animation: rgbBorder 2s linear infinite; }
+.story-row .stTextInput>div>div { margin:0 !important; }
+.story-row .stTextInput>div>div>input { background:#11131a; border:none; box-shadow:none; }
+.story-row .stTextInput>label { display:none !important; }
+.story-row .stButton>button { height:40px; }
 </style>
 """
 
@@ -310,22 +309,18 @@ if active_obj and not (active_obj.get("text", "").strip()):
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
 
-# Stories table – clean, compact layout with RGB highlight on active row
+    # Stories table – clean, compact layout with RGB highlight on active row
 for idx, s in enumerate(stories):
     sid = s["id"]
     is_active = sid == active_sid
-    
-    # Wrap entire story in container with RGB border
-    with st.container():
-        if is_active:
-            st.markdown('<div style="border: 2px solid transparent; animation: rgbBorder 2s linear infinite; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #1B1F29;">', unsafe_allow_html=True)
-        else:
-            st.markdown('<div style="border: 2px solid #2b2f3b; border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #1B1F29;">', unsafe_allow_html=True)
-        
-        cols = st.columns([7,1,1,1,1])
-        
-        # Text input with autosave (no label, completely hidden)
-        text_val = cols[0].text_input("x", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="hidden", placeholder="Beskriv user story...")
+
+    row_class = "story-row active" if is_active else "story-row"
+    st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
+
+    cols = st.columns([7,1,1,1,1])
+
+    # Text input with autosave (label hidden)
+    text_val = cols[0].text_input("Story", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="collapsed", placeholder="Beskriv user story...")
     if text_val != s.get("text", ""):
         def update_text(r):
             for obj in r["stories"]:
