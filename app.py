@@ -753,6 +753,8 @@ else:
     
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
+st.markdown("<br>", unsafe_allow_html=True)
 st.divider()
 
 room = get_room(room_code)
