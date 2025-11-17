@@ -141,8 +141,7 @@ body { overflow-x: hidden; }
 .warning { color:#ffcc00; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI */
-.story-list { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; }
-.story-card { padding:0.75rem 1rem; background:#1B1F29; border-radius:12px; border:2px solid #2b2f3b; position:relative; }
+.story-card { padding:0.6rem 0.8rem; background:#1B1F29; border-radius:10px; border:2px solid #2b2f3b; position:relative; margin-bottom: 8px; }
 .story-card:hover { border-color:#6C5DD3; box-shadow:0 0 8px rgba(108,93,211,.4); }
 .story-card.active { animation: rgbBorder 2s linear infinite; border-color: transparent; }
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
@@ -296,9 +295,7 @@ if st.button("+ Ny story"):
     stories = room.get("stories", [])
     active_sid = room.get("active_story_id")
 
-# Inline editable stories list with RGB highlight on active
-list_html = ["<div class='story-list'>"]
-st.markdown("".join(list_html), unsafe_allow_html=True)
+# Inline editable stories – varje kort hanteras separat (ingen tom wrapper ovanför)
 
 for idx, s in enumerate(stories):
     sid = s["id"]
@@ -374,8 +371,6 @@ for idx, s in enumerate(stories):
             active_sid = room.get("active_story_id")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Close story list container
-    st.markdown("</div>", unsafe_allow_html=True)
 
 # No manual refresh needed; auto-refresh is enabled.
 
