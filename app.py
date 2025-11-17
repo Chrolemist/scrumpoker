@@ -177,8 +177,7 @@ div[data-testid='stVerticalBlock']:has(> .story-anchor) button {
 st.set_page_config(page_title="Scrum Poker", page_icon="🃏", layout="wide")
 st.markdown(CSS, unsafe_allow_html=True)
 
-st.title("🃏 Scrum Poker")
-st.caption("Mörkt tema • Flip-kort • Live-röstning • Flera user stories")
+st.title("Scrum Poker")
 
 # --- Sidebar setup ---
 st.sidebar.header("Inställningar")
@@ -361,30 +360,13 @@ for idx, s in enumerate(stories):
         )
 
         if cols[1].button("Välj", key=f"select_{sid}"):
+            # uppdatera aktiv story både i rummet och lokalt så RGB-rammen syns direkt
             update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
+            st.session_state["active_story_id"] = sid
             room = get_room(room_code)
             active_sid = room.get("active_story_id")
 
-        if cols[2].button("↑", key=f"up_{sid}", disabled=(idx == 0)):
-            def move_up(r, sid=sid):
-                arr = r["stories"]
-                i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
-                if i is not None and i > 0:
-                    arr[i-1], arr[i] = arr[i], arr[i-1]
-            update_room(room_code, move_up)
-            room = get_room(room_code)
-            stories = room.get("stories", [])
-
-        if cols[3].button("↓", key=f"down_{sid}", disabled=(idx >= len(stories) - 1)):
-            def move_down(r, sid=sid):
-                arr = r["stories"]
-                i = next((i for i, o in enumerate(arr) if o["id"] == sid), None)
-                if i is not None and i < len(arr) - 1:
-                    arr[i+1], arr[i] = arr[i-1], arr[i]
-            update_room(room_code, move_down)
-            room = get_room(room_code)
-            stories = room.get("stories", [])
-
+        # ta bort pilarna, behåll bara delete-knappen längst till höger
         if cols[4].button("✖", key=f"del_{sid}"):
             def delete_story(r, sid=sid):
                 r["stories"] = [o for o in r["stories"] if o["id"] != sid]
@@ -412,6 +394,8 @@ for idx, s in enumerate(stories):
                     break
             r["active_story_id"] = sid
         update_room(room_code, update_text)
+        # uppdatera lokal active_story_id direkt för tydlig RGB-markering
+        st.session_state["active_story_id"] = sid
         room = get_room(room_code)
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
