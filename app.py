@@ -1,4 +1,5 @@
 import json, time, threading, uuid
+import sqlite3
 import os
 import shutil
 from html import escape
@@ -10,13 +11,25 @@ from streamlit_autorefresh import st_autorefresh
 ROOMS_LOCK = threading.Lock()
 ROOMS_FILE = Path("rooms_state.json")
 BACKUP_FILE = Path("rooms_state.backup.json")
+DB_FILE = Path("rooms_state.db")
+
+def _db_init():
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        with conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS rooms (room_code TEXT PRIMARY KEY, data TEXT NOT NULL)"
+            )
+        conn.close()
+    except Exception:
+        pass
 
 DEFAULT_TSHIRT = ["XS", "S", "M", "L", "XL"]
 DEFAULT_SCALE = {"XS": 1, "S": 2, "M": 3, "L": 5, "XL": 8}
 
 def load_rooms():
-    """Load rooms with a fallback to backup if the main file is missing, empty or unreadable."""
-    def _read(p: Path):
+    """Load rooms from SQLite if present; fallback to JSON/backup and seed DB if needed."""
+    def _read_json(p: Path):
         try:
             with p.open("r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -26,15 +39,44 @@ def load_rooms():
             pass
         return {}
 
-    rooms = _read(ROOMS_FILE) if ROOMS_FILE.exists() else {}
+    # Prefer DB
+    rooms: dict = {}
+    if DB_FILE.exists():
+        try:
+            _db_init()
+            conn = sqlite3.connect(DB_FILE)
+            cur = conn.execute("SELECT room_code, data FROM rooms")
+            for code, data in cur.fetchall():
+                try:
+                    rooms[code] = json.loads(data)
+                except Exception:
+                    continue
+            conn.close()
+        except Exception:
+            rooms = {}
     if rooms:
         return rooms
-    # fallback to backup if available
-    if BACKUP_FILE.exists():
-        backup = _read(BACKUP_FILE)
-        if backup:
-            return backup
-    return {}
+
+    # Fallback to JSON main, then backup
+    rooms = _read_json(ROOMS_FILE) if ROOMS_FILE.exists() else {}
+    if not rooms and BACKUP_FILE.exists():
+        rooms = _read_json(BACKUP_FILE)
+
+    # Seed DB with what we have
+    if rooms:
+        try:
+            _db_init()
+            conn = sqlite3.connect(DB_FILE)
+            with conn:
+                for code, data in rooms.items():
+                    conn.execute(
+                        "INSERT OR REPLACE INTO rooms(room_code, data) VALUES(?, ?)",
+                        (code, json.dumps(data, ensure_ascii=False)),
+                    )
+            conn.close()
+        except Exception:
+            pass
+    return rooms
 
 def save_rooms(rooms):
     """Safely write rooms, keeping a backup of the previous state and using atomic replace.
@@ -66,7 +108,7 @@ def save_rooms(rooms):
     except Exception:
         pass
 
-    # atomic replace or best-effort fallback
+    # atomic replace or best-effort fallback (JSON)
     try:
         os.replace(tmp, ROOMS_FILE)
     except FileNotFoundError:
@@ -80,6 +122,30 @@ def save_rooms(rooms):
             # as last resort, attempt direct write
             with ROOMS_FILE.open("w", encoding="utf-8") as f:
                 json.dump(rooms, f, ensure_ascii=False, indent=2)
+
+    # Also persist to SQLite per-room for durability
+    try:
+        _db_init()
+        conn = sqlite3.connect(DB_FILE)
+        with conn:
+            # upsert all rooms
+            for code, data in rooms.items():
+                conn.execute(
+                    "INSERT OR REPLACE INTO rooms(room_code, data) VALUES(?, ?)",
+                    (code, json.dumps(data, ensure_ascii=False)),
+                )
+            # remove deleted rooms
+            if rooms:
+                placeholders = ",".join(["?"] * len(rooms))
+                conn.execute(
+                    f"DELETE FROM rooms WHERE room_code NOT IN ({placeholders})",
+                    list(rooms.keys()),
+                )
+            else:
+                conn.execute("DELETE FROM rooms")
+        conn.close()
+    except Exception:
+        pass
 
 def init_room(rooms, room_code):
     if room_code not in rooms:
