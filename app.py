@@ -1,3 +1,10 @@
+# Lista med roliga anonyma namn
+ANONYMOUS_NAMES = [
+    "Anonym Älg", "Kod-Katt", "Buggsurfare", "Pixel-Panda", "Fikafantast", "Test-Tiger",
+    "Debug-Delfin", "Sprint-Spindel", "Release-Räv", "Commit-Koala", "Merge-Mås",
+    "Pull-Pingvin", "Push-Papegoja", "Branch-Björn", "Feature-Får", "Hotfix-Hund",
+    "Epic-Ekorre", "Story-Säl", "Task-Tupp", "Retro-Ren"
+]
 
 import time, uuid
 from html import escape
@@ -229,8 +236,16 @@ room_code = st.sidebar.text_input("Rumskod", value=st.session_state.get("room_co
 if room_code != st.session_state.get("room_code"):
     st.session_state["room_code"] = room_code
 
+
 # Namn: ett aktivt namn per webbläsare, men det går att byta
 _prev_name = st.session_state.get("player_name", "")
+
+# Om inget namn finns, tilldela ett slumpmässigt anonymt namn
+if not _prev_name:
+    import random
+    st.session_state["player_name"] = random.choice(ANONYMOUS_NAMES)
+    _prev_name = st.session_state["player_name"]
+
 player_name_input = st.sidebar.text_input(
     "Ditt namn",
     value=_prev_name,
