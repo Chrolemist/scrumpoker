@@ -151,17 +151,15 @@ body { overflow-x: hidden; }
 }
 
 /* Active story expander highlight – allow for wrappers between marker and expander */
-.active-expander-marker ~ * [data-testid="stExpander"] {
-    border: 2px solid #6C5DD3;
-    border-radius: 8px;
-    padding: 4px;
-    margin: 8px 0;
-    animation: rgbBorder 3s linear infinite;
-}
-/* Also tint the header (summary) for active story */
-.active-expander-marker ~ * [data-testid="stExpander"] summary {
-    background: rgba(108,93,211,0.12);
+.active-story-badge {
+    display:inline-block;
+    padding: 2px 8px;
     border-radius: 6px;
+    border: 1px solid #6C5DD3;
+    background: rgba(108,93,211,0.12);
+    color:#cfcff7;
+    font-size: 0.8rem;
+    margin: 4px 0 6px 0;
 }
 
 /* Make expander titles wrap and show full text */
@@ -173,16 +171,7 @@ body { overflow-x: hidden; }
 }
 
 /* Active select button RGB glow */
-@keyframes rgbBtn {
-    0% { box-shadow: 0 0 10px #ff004c, inset 0 0 0 2px #ff004c; }
-    33% { box-shadow: 0 0 10px #00e1ff, inset 0 0 0 2px #00e1ff; }
-    66% { box-shadow: 0 0 10px #7dff00, inset 0 0 0 2px #7dff00; }
-    100% { box-shadow: 0 0 10px #ff004c, inset 0 0 0 2px #ff004c; }
-}
-.active-select-marker + div button {
-    animation: rgbBtn 3s linear infinite;
-    border-color: transparent;
-}
+
 
 .story-arrow {
     display:none;
@@ -392,11 +381,11 @@ for idx, story in enumerate(stories):
     # Visa story som expanderbar sektion (som sidomenyn)
     story_title = (raw_text or "").strip() or f"User Story {idx+1}"
     
-    # Marker element to style the next expander via CSS
+    # Badge for active story and auto-expand when selected
     if is_active:
-        st.markdown('<div class="active-expander-marker"></div>', unsafe_allow_html=True)
+        st.markdown('<span class="active-story-badge">Aktiv user story</span>', unsafe_allow_html=True)
 
-    with st.expander(story_title, expanded=False):
+    with st.expander(story_title, expanded=is_active):
         col1, col2, col3 = st.columns([4, 1, 1])
         
         with col1:
@@ -409,13 +398,13 @@ for idx, story in enumerate(stories):
             )
         
         with col2:
-            # If this story is active, add a CSS marker so the next button glows
             if is_active:
-                st.markdown('<div class="active-select-marker"></div>', unsafe_allow_html=True)
-            if st.button("Välj för röstning", key=f"select_{sid}", use_container_width=True):
-                update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
-                st.session_state["active_story_id"] = sid
-                st.rerun()
+                st.button("Vald ✓", key=f"selected_{sid}", use_container_width=True, disabled=True)
+            else:
+                if st.button("Välj för röstning", key=f"select_{sid}", use_container_width=True):
+                    update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
+                    st.session_state["active_story_id"] = sid
+                    st.rerun()
         
         with col3:
             if st.button("✖ Ta bort", key=f"del_{sid}", use_container_width=True):
