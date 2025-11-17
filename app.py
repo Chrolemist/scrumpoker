@@ -283,7 +283,10 @@ with scale_section:
     if selected_mode != current_mode:
         update_room(room_code, lambda r, m=selected_mode: r.update(scale_mode=m))
         room = get_room(room_code)
-        current_mode = room.get("scale_mode", current_mode)
+        if not room:
+            update_room(room_code, lambda r: r)
+            room = get_room(room_code)
+        current_mode = room.get("scale_mode", selected_mode)
 
     if selected_mode == "tshirt":
         labels = room.get("scale_labels") or DEFAULT_TSHIRT[:]
