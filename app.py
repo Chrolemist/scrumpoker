@@ -145,20 +145,21 @@ body { overflow-x: hidden; }
 /* Stories UI – tabell/lista utan extra kort */
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 1px #ff004c; } 33% { box-shadow:0 0 0 1px #00e1ff; } 66% { box-shadow:0 0 0 1px #7dff00; } 100% { box-shadow:0 0 0 1px #ff004c; } }
 .story-table-header {
-    font-size:0.85rem;
+    font-size:0.8rem;
     text-transform:uppercase;
-    letter-spacing:0.05em;
+    letter-spacing:0.08em;
     color:#9ca3af;
-    margin-bottom:0.25rem;
+    margin-bottom:0.15rem;
 }
 .story-row {
-    border-radius:8px;
-    padding:0.15rem 0.3rem 0.1rem 0.3rem;
-    margin-bottom:0.1rem;
+    border-radius:10px;
+    padding:0.35rem 0.6rem;
+    margin-bottom:0.3rem;
+    background:#151822;
 }
 .story-row.active-story {
-    background:rgba(108,93,211,0.16);
-    box-shadow:0 0 0 1px #6C5DD3, 0 0 10px rgba(108,93,211,0.6);
+    background:rgba(108,93,211,0.12);
+    box-shadow:0 0 0 1px #6C5DD3, 0 0 14px rgba(108,93,211,0.75);
 }
 .story-row button {
     width:100%;
@@ -166,19 +167,20 @@ body { overflow-x: hidden; }
     font-size:0.8rem;
 }
 .story-card {
-    background:#11131a;
+    background:#0E1014;
     border:1px solid #2b2f3b;
-    border-radius:10px;
-    padding:0.6rem 0.75rem;
+    border-radius:8px;
+    padding:0.5rem 0.75rem;
     color:#f0f0f4;
-    min-height:70px;
+    min-height:64px;
     white-space:pre-wrap;
 }
 .story-card.active-card {
-    box-shadow:0 0 0 2px #6C5DD3, 0 0 12px rgba(108,93,211,0.7);
+    border-color:#6C5DD3;
+    box-shadow:0 0 0 1px #6C5DD3, 0 0 10px rgba(108,93,211,0.6);
 }
 .story-card.empty-card {
-    opacity:0.65;
+    opacity:0.7;
     font-style:italic;
 }
 </style>
