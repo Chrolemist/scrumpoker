@@ -7,9 +7,9 @@ textColor = "#FAFAFA"
 font = "sans serif"
 
 [theme.sidebar]
-backgroundColor = "#0E1014"
+backgroundColor = "#303744ff"
 textColor = "#FAFAFA"
-borderColor = "#2B2F3B"
+borderColor = "#4a4f5eff"
 widgetBackgroundColor = "#1B1F29"
 widgetBorderColor = "#2B2F3B"
 skeletonBackgroundColor = "#151822"
