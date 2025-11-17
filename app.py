@@ -773,7 +773,7 @@ with card_container:
 
     # Render cards in a grid with 3 columns per row
     if players_list:
-        cols_per_row = 3
+        cols_per_row = 9
         num_rows = (len(players_list) + cols_per_row - 1) // cols_per_row
         for i in range(num_rows):
             row_players = players_list[i*cols_per_row:(i+1)*cols_per_row]
