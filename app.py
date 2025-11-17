@@ -133,11 +133,12 @@ def cached_room(room_code, last_update):
 CSS = """
 <style>
 body { overflow-x: hidden; }
-.card-grid { display: flex; flex-wrap: wrap; gap: 1rem; }
+.card-grid { display: flex; flex-wrap: wrap; gap: 1.25rem; }
 .card { position: relative; width: 100px; height: 140px; perspective: 800px; cursor: pointer; }
 .card-inner { position: absolute; width: 100%; height: 100%; transition: transform 0.8s; transform-style: preserve-3d; }
 .card.flip .card-inner { transform: rotateY(180deg); }
-.card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 10px; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:1.4rem; letter-spacing:1px; }
+.card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 10px; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:1.4rem; letter-spacing:1px; padding: 8px; overflow-wrap: anywhere; word-break: break-word; line-height: 1.1; text-align: center; }
+.card-front .name.long { font-size: 1.0rem; }
 .card-front { background: linear-gradient(135deg, #202431 0%, #2b2f3b 60%, #343948 100%); box-shadow:0 0 8px rgba(108,93,211,0.5); }
 .card-back { background: linear-gradient(135deg, #6C5DD3, #8E7BFF); transform: rotateY(180deg); box-shadow:0 0 12px rgba(120,80,255,0.6); }
 .card:hover .card-front { animation: rgbPulse 2s linear infinite; }
@@ -341,6 +342,11 @@ with st.sidebar.expander("Timer"):
 
 # --- Chat (sidebar, bottom) ---
 with st.sidebar.expander("Chat", expanded=False):
+    # Live refresh toggle
+    st.session_state.setdefault("chat_live", True)
+    chat_live = st.checkbox("Live-uppdatera chatten", value=st.session_state["chat_live"], key="chat_live")
+    if chat_live:
+        st_autorefresh(interval=2000, key="chat_live_refresh")
     room = get_room(room_code)  # refresh to include any new messages
     msgs = (room.get("chat") or [])[-200:]
     me = (st.session_state.get("player_name") or "").strip()
@@ -599,7 +605,9 @@ with card_container:
         has_vote = p in all_votes
         val = all_votes.get(p, "?")
         card_classes = "card flip" if revealed and has_vote else "card"
-        front_content = p
+        display_name = escape(str(p))
+        name_class = "name long" if len(str(p)) > 12 else "name"
+        front_content = f"<span class='{name_class}'>{display_name}</span>"
         back_content = val if revealed and has_vote else "?"
         card_html = f"<div class='{card_classes}'><div class='card-inner'>" \
                     f"<div class='card-face card-front'>{front_content}</div>" \
