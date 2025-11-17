@@ -143,7 +143,21 @@ body { overflow-x: hidden; }
 .warning { color:#ffcc00; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI – tabell/lista utan extra kort */
-@keyframes rgbBorder { 0% { box-shadow:0 0 0 1px #ff004c; } 33% { box-shadow:0 0 0 1px #00e1ff; } 66% { box-shadow:0 0 0 1px #7dff00; } 100% { box-shadow:0 0 0 1px #ff004c; } }
+@keyframes rgbBorder { 
+    0% { border-color: #ff004c; box-shadow: 0 0 10px rgba(255,0,76,0.5); } 
+    33% { border-color: #00e1ff; box-shadow: 0 0 10px rgba(0,225,255,0.5); } 
+    66% { border-color: #7dff00; box-shadow: 0 0 10px rgba(125,255,0,0.5); } 
+    100% { border-color: #ff004c; box-shadow: 0 0 10px rgba(255,0,76,0.5); } 
+}
+
+/* Active story expander with RGB border */
+.active-story-expander {
+    border: 2px solid #6C5DD3;
+    border-radius: 8px;
+    padding: 4px;
+    margin: 8px 0;
+    animation: rgbBorder 3s linear infinite;
+}
 
 .story-arrow {
     display:none;
@@ -355,6 +369,10 @@ for idx, story in enumerate(stories):
     story_title = display_text or f"User Story {idx+1}"
     active_indicator = "⭐ " if is_active else ""
     
+    # Add CSS wrapper for active story RGB border
+    if is_active:
+        st.markdown('<div class="active-story-expander">', unsafe_allow_html=True)
+    
     with st.expander(f"{active_indicator}{story_title}", expanded=False):
         col1, col2, col3 = st.columns([4, 1, 1])
         
@@ -400,8 +418,10 @@ for idx, story in enumerate(stories):
                         break
                 r["active_story_id"] = sid  # Sätt som aktiv när man redigerar
             update_room(room_code, update_text)
-            st.session_state["active_story_id"] = sid
-            st.rerun()
+    
+    # Close CSS wrapper for active story
+    if is_active:
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # No manual refresh needed; auto-refresh is enabled.
 
