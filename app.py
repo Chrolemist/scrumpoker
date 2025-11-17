@@ -423,6 +423,11 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
         new_combined = new_combined[-500:]
 
     st.session_state[combined_key] = new_combined
+    # Efter att ha ackumulerat i combined, rensa lokala temporära snapshots så
+    # de inte läggs till igen vid nästa rerun.
+    st.session_state[local_key] = []
+    if "_last_sent_chat_snapshot" in st.session_state:
+        st.session_state["_last_sent_chat_snapshot"] = None
     msgs = new_combined[-200:]
     me = (st.session_state.get("player_name") or "").strip()
 
@@ -506,6 +511,15 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
             st.write(snap)
         else:
             st.write(room.get("chat", [])[-20:])
+        # Extra debug: visa nycklar och duplicat-räkning i kombinerad lista
+        combined_key = f"chat_combined_{room_code}"
+        combined = st.session_state.get(combined_key, [])
+        keys = [(m.get("ts"), m.get("name"), m.get("text")) for m in combined]
+        from collections import Counter
+        cnt = Counter(keys)
+        dupes = {k: v for k, v in cnt.items() if v > 1}
+        st.markdown("**DEBUG: combined keys (count) — dubbletter:**")
+        st.write(dupes)
 
 # --- Main content ---
 # Ensure player registered (lägg alltid till namnet, även anonymt)
