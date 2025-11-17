@@ -142,11 +142,11 @@ body { overflow-x: hidden; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI */
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 2px #ff004c; } 33% { box-shadow:0 0 0 2px #00e1ff; } 66% { box-shadow:0 0 0 2px #7dff00; } 100% { box-shadow:0 0 0 2px #ff004c; } }
-.story-card { background:#1B1F29; border:2px solid #2b2f3b; border-radius:14px; padding:0.9rem 1rem; margin-bottom:0.6rem; transition: border 0.3s ease; }
-.story-card p { margin:0; color:#f0f0f4; line-height:1.4; }
-.story-card.empty { opacity:0.6; font-style:italic; }
+.story-card { background:#1B1F29; border:2px solid #2b2f3b; border-radius:14px; padding:0.6rem 0.8rem; margin-bottom:0.6rem; transition: border 0.3s ease; }
+.story-card textarea { background:#11131a; border:1px solid #2b2f3b; border-radius:10px; color:#f0f0f4; resize:vertical; min-height:90px; }
+.story-card.empty textarea { opacity:0.7; font-style:italic; }
 .story-card.active { border-color:transparent; animation: rgbBorder 2s linear infinite; }
-.story-actions { display:flex; gap:0.5rem; margin-bottom:1.2rem; }
+.story-actions { display:flex; gap:0.5rem; margin-bottom:0.4rem; }
 .story-actions button { width:100%; }
 </style>
 """
@@ -309,33 +309,35 @@ if active_obj and not (active_obj.get("text", "").strip()):
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
 
-    # Stories display – cards with RGB highlight and popover editing
+    # Stories display – cards with RGB highlight and inline editing
     for idx, s in enumerate(stories):
         sid = s["id"]
         is_active = sid == active_sid
         raw_text = s.get("text", "")
-        safe_text = (raw_text.strip() or "(tom story)").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
         card_class = "story-card active" if is_active else ("story-card empty" if not raw_text.strip() else "story-card")
-        st.markdown(f"<div class='{card_class}'>{safe_text}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='{card_class}'>", unsafe_allow_html=True)
 
-        cols = st.columns([1,1,1,1,1])
+        cols = st.columns([7,1,1,1,1])
 
-        if cols[0].button("Välj", key=f"select_{sid}"):
+        # Inline text area editing
+        text_val = cols[0].text_area("", value=raw_text, key=f"story_text_{sid}", label_visibility="collapsed", height=120, placeholder="Beskriv user story...")
+        if text_val != raw_text:
+            def update_text(r):
+                for obj in r["stories"]:
+                    if obj["id"] == sid:
+                        obj["text"] = text_val
+                        break
+                r["active_story_id"] = sid
+            update_room(room_code, update_text)
+            room = get_room(room_code)
+            stories = room.get("stories", [])
+            active_sid = room.get("active_story_id")
+            raw_text = text_val
+
+        if cols[1].button("Välj", key=f"select_{sid}"):
             update_room(room_code, lambda r: r.update(active_story_id=sid))
             room = get_room(room_code)
             active_sid = room.get("active_story_id")
-
-        with cols[1].popover("✏️", use_container_width=True):
-            edited_text = st.text_area("Redigera story", value=raw_text, key=f"edit_story_{sid}", height=160)
-            if st.button("Spara", key=f"save_story_{sid}"):
-                def update_text(r):
-                    for obj in r["stories"]:
-                        if obj["id"] == sid:
-                            obj["text"] = edited_text
-                            break
-                    r["active_story_id"] = sid
-                update_room(room_code, update_text)
-                st.experimental_rerun()
 
         if cols[2].button("↑", key=f"up_{sid}", disabled=(idx == 0)):
             def move_up(r):
@@ -375,6 +377,8 @@ if active_obj and not (active_obj.get("text", "").strip()):
             room = get_room(room_code)
             stories = room.get("stories", [])
             active_sid = room.get("active_story_id")
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # No manual refresh needed; auto-refresh is enabled.
