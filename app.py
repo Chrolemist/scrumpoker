@@ -160,17 +160,26 @@ body { overflow-x: hidden; }
     background:rgba(108,93,211,0.16);
     box-shadow:0 0 0 1px #6C5DD3, 0 0 10px rgba(108,93,211,0.6);
 }
-.story-row textarea {
-    background:#11131a;
-    border:1px solid #2b2f3b;
-    border-radius:6px;
-    color:#f0f0f4;
-    min-height:70px;
-}
 .story-row button {
     width:100%;
     height:32px;
     font-size:0.8rem;
+}
+.story-card {
+    background:#11131a;
+    border:1px solid #2b2f3b;
+    border-radius:10px;
+    padding:0.6rem 0.75rem;
+    color:#f0f0f4;
+    min-height:70px;
+    white-space:pre-wrap;
+}
+.story-card.active-card {
+    box-shadow:0 0 0 2px #6C5DD3, 0 0 12px rgba(108,93,211,0.7);
+}
+.story-card.empty-card {
+    opacity:0.65;
+    font-style:italic;
 }
 </style>
 """
@@ -350,7 +359,7 @@ if active_obj and not (active_obj.get("text", "").strip()):
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
 
-# Stories display – tabelliknande lista
+# Stories display – tabelliknande lista med eget story-kort
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
 
@@ -378,15 +387,28 @@ for idx, s in enumerate(stories):
 
         cols = st.columns([8, 1, 1])
 
-        # Inline text area editing
-        text_val = cols[0].text_area(
-            "",
-            value=raw_text,
-            key=f"story_text_{sid}",
-            label_visibility="collapsed",
-            height=90,
-            placeholder="Beskriv user story...",
-        )
+        # Eget story-kort där RGB/glow kan ligga exakt runt texten
+        card_classes = ["story-card"]
+        display_text = raw_text or "Beskriv user story..."
+        if not raw_text:
+            card_classes.append("empty-card")
+        if is_active:
+            card_classes.append("active-card")
+
+        with cols[0]:
+            # Visa storyn som ett stylat kort
+            st.markdown(
+                f"<div class='{' '.join(card_classes)}'>{display_text}</div>",
+                unsafe_allow_html=True,
+            )
+            # Textarea för redigering under kortet
+            text_val = st.text_area(
+                "",
+                value=raw_text,
+                key=f"story_text_{sid}",
+                label_visibility="collapsed",
+                height=90,
+            )
 
         if cols[1].button("Välj", key=f"select_{sid}"):
             update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
