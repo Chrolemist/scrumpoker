@@ -388,6 +388,9 @@ with st.sidebar.expander("Chat", expanded=False):
     # Always live-refresh chat at a light interval
     st_autorefresh(interval=2000, key="chat_live_refresh")
     room = get_room(room_code)  # refresh to include any new messages
+    # Hämta om rummet direkt efter att meddelande skickats
+    if st.session_state.get("_clear_chat_input", False):
+        room = get_room(room_code)
     msgs = (room.get("chat") or [])[-200:]
     me = (st.session_state.get("player_name") or "").strip()
 
