@@ -362,8 +362,12 @@ with st.sidebar.expander("Chat", expanded=False):
     chat_html.append("</div>")
     st.markdown("\n".join(chat_html), unsafe_allow_html=True)
 
+    # Clear input on next run if flagged
+    if st.session_state.pop("_clear_chat_input", False):
+        st.session_state["chat_input"] = ""
+
     # Send form
-    with st.form(key="chat_form", enter_to_submit=True):
+    with st.form(key="chat_form"):
         chat_text = st.text_input("Skriv ett meddelande", key="chat_input", placeholder="Skriv ett meddelande…")
         sent = st.form_submit_button("Skicka")
         if sent:
@@ -378,7 +382,7 @@ with st.sidebar.expander("Chat", expanded=False):
                     if len(lst) > 500:
                         del lst[:-500]
                 update_room(room_code, append_msg)
-                st.session_state["chat_input"] = ""
+                st.session_state["_clear_chat_input"] = True
                 st.rerun()
 
 # Reveal / reset controls
