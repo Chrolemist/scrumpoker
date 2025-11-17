@@ -711,7 +711,7 @@ if end:
     st.markdown(f"<span class='timer'>⏱️ {remaining}s</span>", unsafe_allow_html=True)
 
 # Voting interface
-st.subheader("Rösta")
+
 scale_mode = room.get("scale_mode", "points")
 current_scale = room.get("scale", DEFAULT_SCALE)
 current_labels = room.get("scale_labels", DEFAULT_TSHIRT)
@@ -759,7 +759,7 @@ active_sid = room.get("active_story_id")
 all_votes = room.get("votes", {}).get(active_sid, {})
 revealed = room.get("revealed_for", {}).get(active_sid, False)
 
-st.subheader("Kort")
+
 card_container = st.container()
 with card_container:
     players_list = sorted(room.get("players", []))
@@ -771,7 +771,7 @@ with card_container:
     room = get_room(room_code)
     pings = room.get("pings", {})
 
-    # Render cards in a grid with 3 columns per row
+    # Render cards in a grid with 9 columns per row
     if players_list:
         cols_per_row = 9
         num_rows = (len(players_list) + cols_per_row - 1) // cols_per_row
