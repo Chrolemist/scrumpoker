@@ -159,6 +159,18 @@ body { overflow-x: hidden; }
     animation: rgbBorder 3s linear infinite;
 }
 
+/* Active select button RGB glow */
+@keyframes rgbBtn {
+    0% { box-shadow: 0 0 10px #ff004c, inset 0 0 0 2px #ff004c; }
+    33% { box-shadow: 0 0 10px #00e1ff, inset 0 0 0 2px #00e1ff; }
+    66% { box-shadow: 0 0 10px #7dff00, inset 0 0 0 2px #7dff00; }
+    100% { box-shadow: 0 0 10px #ff004c, inset 0 0 0 2px #ff004c; }
+}
+.active-select-marker + div button {
+    animation: rgbBtn 3s linear infinite;
+    border-color: transparent;
+}
+
 .story-arrow {
     display:none;
     position:absolute;
@@ -385,6 +397,9 @@ for idx, story in enumerate(stories):
             )
         
         with col2:
+            # If this story is active, add a CSS marker so the next button glows
+            if is_active:
+                st.markdown('<div class="active-select-marker"></div>', unsafe_allow_html=True)
             if st.button("Välj för röstning", key=f"select_{sid}", use_container_width=True):
                 update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
                 st.session_state["active_story_id"] = sid
