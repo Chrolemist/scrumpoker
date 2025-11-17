@@ -487,12 +487,15 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
                 # Fetch room immediately and save a persistent snapshot in session_state
                 _r2 = get_room(room_code)
                 st.session_state["_last_sent_chat_snapshot"] = _r2.get("chat", [])[-20:]
-                # Also append the new message to a per-session local chat history so
-                # multiple messages from this client are shown even if server chat lags.
+                # Also append the server's last message to a per-session local chat history
+                # so we reuse the server timestamp and avoid duplicates.
                 local_key = f"chat_history_{room_code}"
-                hist = st.session_state.setdefault(local_key, [])
-                hist.append({"name": me, "text": msg, "ts": time.time()})
-                st.session_state[local_key] = hist
+                last_msgs = _r2.get("chat", [])
+                if last_msgs:
+                    last_msg = last_msgs[-1]
+                    hist = st.session_state.setdefault(local_key, [])
+                    hist.append(last_msg)
+                    st.session_state[local_key] = hist
                 st.rerun()
 
     # If debug enabled, show raw chat data or the last sent snapshot so it doesn't blink
