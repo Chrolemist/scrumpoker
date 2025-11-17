@@ -144,33 +144,20 @@ body { overflow-x: hidden; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI – tabell/lista utan extra kort */
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 1px #ff004c; } 33% { box-shadow:0 0 0 1px #00e1ff; } 66% { box-shadow:0 0 0 1px #7dff00; } 100% { box-shadow:0 0 0 1px #ff004c; } }
-.story-table-header {
-    font-size:0.8rem;
-    text-transform:uppercase;
-    letter-spacing:0.08em;
-    color:#9ca3af;
-    margin-bottom:0.15rem;
-}
-.story-row {
-    border-radius:10px;
-    padding:0.25rem 0.4rem;
-    margin-bottom:0.2rem;
-}
-.story-row button {
-    width:100%;
-    height:32px;
-    font-size:0.8rem;
-}
-.story-row textarea {
+.active-story-card {
     background:#0E1014;
-    border:1px solid #2b2f3b;
-    border-radius:8px;
-    color:#f0f0f4;
-    min-height:80px;
+    border:2px solid #6C5DD3;
+    border-radius:12px;
+    padding:1rem;
+    margin:1rem 0;
+    box-shadow:0 0 0 1px #6C5DD3, 0 0 20px rgba(108,93,211,0.8);
+    animation:rgbBorder 3s linear infinite;
 }
-.story-row.active-story textarea {
-    border-color:#6C5DD3;
-    background:rgba(108,93,211,0.05);
+@keyframes rgbBorder {
+    0% { box-shadow:0 0 0 2px #ff004c, 0 0 20px rgba(255,0,76,0.6); }
+    33% { box-shadow:0 0 0 2px #00e1ff, 0 0 20px rgba(0,225,255,0.6); }
+    66% { box-shadow:0 0 0 2px #7dff00, 0 0 20px rgba(125,255,0,0.6); }
+    100% { box-shadow:0 0 0 2px #ff004c, 0 0 20px rgba(255,0,76,0.6); }
 }
 .story-arrow {
     display:none;
@@ -367,55 +354,30 @@ if active_obj and not (active_obj.get("text", "").strip()):
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
 
-# Stories display – tabelliknande lista med eget story-kort
+# Stories display – dropdown med aktiv story-kort
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
 
-header_cols = st.columns([8, 1, 1])
-with header_cols[0]:
-    st.markdown("<div class='story-table-header'>User story</div>", unsafe_allow_html=True)
-with header_cols[1]:
-    st.markdown("<div class='story-table-header'>Välj</div>", unsafe_allow_html=True)
-with header_cols[2]:
-    st.markdown("<div class='story-table-header'>Ta bort</div>", unsafe_allow_html=True)
-
-for idx, s in enumerate(stories):
-    sid = s["id"]
-    is_active = sid == active_sid
-    raw_text = s.get("text", "")
+# Dropdown för att välja story
+if stories:
+    story_options = [(f"Story {idx+1}: {s.get('text', 'Tom story')[:50]}{'...' if len(s.get('text', '')) > 50 else ''}", s["id"]) for idx, s in enumerate(stories)]
     
-    # Lägg active-story klass på raden för textarea-styling
-    row_class = "story-row active-story" if is_active else "story-row"
-    
-    with st.container():
-        st.markdown(f"<div class='{row_class}' style='position:relative;'>", unsafe_allow_html=True)
-        st.markdown("<div class='story-arrow'>▶</div>", unsafe_allow_html=True)
-        
-        cols = st.columns([8, 1, 1])
-
-    with cols[0]:
-        # Textarea för redigering (ser ut som story-kortet med RGB-ram)
-        text_val = st.text_area(
-            "",
-            value=raw_text,
-            key=f"story_text_{sid}",
-            label_visibility="collapsed",
-            height=90,
-            placeholder="Beskriv user story...",
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        selected_story = st.selectbox(
+            "Välj user story:",
+            options=[sid for _, sid in story_options],
+            format_func=lambda sid: next(display for display, s_id in story_options if s_id == sid),
+            index=next((i for i, (_, sid) in enumerate(story_options) if sid == active_sid), 0),
+            key="story_selector"
         )
-
-    if cols[1].button("Välj", key=f"select_{sid}"):
-        update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
-        st.session_state["active_story_id"] = sid
-        room = get_room(room_code)
-        active_sid = room.get("active_story_id")
-
-    if cols[2].button("✖", key=f"del_{sid}"):
-        def delete_story(r, sid=sid):
-            r["stories"] = [o for o in r["stories"] if o["id"] != sid]
-            r.get("votes", {}).pop(sid, None)
-            r.get("revealed_for", {}).pop(sid, None)
-            if r.get("active_story_id") == sid:
+    
+    with col2:
+        if st.button("✖ Ta bort", key="delete_active_story"):
+            def delete_story(r):
+                r["stories"] = [o for o in r["stories"] if o["id"] != active_sid]
+                r.get("votes", {}).pop(active_sid, None)
+                r.get("revealed_for", {}).pop(active_sid, None)
                 if r["stories"]:
                     r["active_story_id"] = r["stories"][0]["id"]
                 else:
@@ -424,25 +386,38 @@ for idx, s in enumerate(stories):
                     r["votes"].setdefault(new_sid, {})
                     r["revealed_for"].setdefault(new_sid, False)
                     r["active_story_id"] = new_sid
-        update_room(room_code, delete_story)
-        room = get_room(room_code)
-        stories = room.get("stories", [])
-        active_sid = room.get("active_story_id")
+            update_room(room_code, delete_story)
+            st.rerun()
+    
+    # Uppdatera aktiv story om dropdown ändrats
+    if selected_story != active_sid:
+        update_room(room_code, lambda r: r.update(active_story_id=selected_story))
+        st.session_state["active_story_id"] = selected_story
+        st.rerun()
+    
+    # Visa den aktiva storyn i en RGB-highlightad kort
+    active_story = next((s for s in stories if s["id"] == active_sid), None)
+    if active_story:
+        st.markdown("<div class='active-story-card'>", unsafe_allow_html=True)
+        
+        text_val = st.text_area(
+            "Redigera user story:",
+            value=active_story.get("text", ""),
+            key=f"story_text_{active_sid}",
+            height=120,
+            placeholder="Beskriv user story...",
+        )
         
         st.markdown("</div>", unsafe_allow_html=True)
-
-    if text_val != raw_text:
-        def update_text(r, sid=sid, text_val=text_val):
-            for obj in r["stories"]:
-                if obj["id"] == sid:
-                    obj["text"] = text_val
-                    break
-            r["active_story_id"] = sid
-        update_room(room_code, update_text)
-        st.session_state["active_story_id"] = sid
-        room = get_room(room_code)
-        stories = room.get("stories", [])
-        active_sid = room.get("active_story_id")
+        
+        # Uppdatera texten om den ändrats
+        if text_val != active_story.get("text", ""):
+            def update_text(r):
+                for obj in r["stories"]:
+                    if obj["id"] == active_sid:
+                        obj["text"] = text_val
+                        break
+            update_room(room_code, update_text)
 
 # No manual refresh needed; auto-refresh is enabled.
 
