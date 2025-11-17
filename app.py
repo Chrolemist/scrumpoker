@@ -144,33 +144,7 @@ body { overflow-x: hidden; }
 .timer { font-size:1.2rem; font-weight:600; }
 /* Stories UI – tabell/lista utan extra kort */
 @keyframes rgbBorder { 0% { box-shadow:0 0 0 1px #ff004c; } 33% { box-shadow:0 0 0 1px #00e1ff; } 66% { box-shadow:0 0 0 1px #7dff00; } 100% { box-shadow:0 0 0 1px #ff004c; } }
-.story-card {
-    background:#151822;
-    border:1px solid #2b2f3b;
-    border-radius:10px;
-    padding:0.8rem;
-    margin:0.5rem 0;
-    transition:all 0.3s ease;
-}
-.story-card:hover {
-    border-color:#6C5DD3;
-    box-shadow:0 0 10px rgba(108,93,211,0.3);
-}
-.active-story-card {
-    background:#0E1014;
-    border:2px solid #6C5DD3;
-    border-radius:12px;
-    padding:1rem;
-    margin:0.8rem 0;
-    box-shadow:0 0 0 1px #6C5DD3, 0 0 20px rgba(108,93,211,0.8);
-    animation:rgbBorder 3s linear infinite;
-}
-@keyframes rgbBorder {
-    0% { box-shadow:0 0 0 2px #ff004c, 0 0 20px rgba(255,0,76,0.6); }
-    33% { box-shadow:0 0 0 2px #00e1ff, 0 0 20px rgba(0,225,255,0.6); }
-    66% { box-shadow:0 0 0 2px #7dff00, 0 0 20px rgba(125,255,0,0.6); }
-    100% { box-shadow:0 0 0 2px #ff004c, 0 0 20px rgba(255,0,76,0.6); }
-}
+
 .story-arrow {
     display:none;
     position:absolute;
@@ -366,79 +340,68 @@ if active_obj and not (active_obj.get("text", "").strip()):
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
 
-# Stories display – individuella kort med toggle-funktionalitet
+# Stories display – expanderbara kort som sidomenyn
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
 
-# Toggle för att visa/dölja edit-controls
-show_edit_controls = st.session_state.get("show_story_controls", False)
-if st.button("⚙️ Redigera stories" if not show_edit_controls else "👁️ Dölj kontroller"):
-    st.session_state["show_story_controls"] = not show_edit_controls
-    st.rerun()
-
-# Visa alla stories som individuella kort
+# Visa alla stories som expanderbara kort
 for idx, story in enumerate(stories):
     sid = story["id"]
     is_active = sid == active_sid
     raw_text = story.get("text", "")
     
-    # Story-kort med RGB-ram om aktiv
-    card_class = "active-story-card" if is_active else "story-card"
-    display_text = raw_text or f"User Story {idx+1}"
+    # Visa story som expanderbar sektion (som sidomenyn)
+    display_text = raw_text[:50] + "..." if len(raw_text) > 50 else raw_text
+    story_title = display_text or f"User Story {idx+1}"
+    active_indicator = "⭐ " if is_active else ""
     
-    st.markdown(f"<div class='{card_class}' onclick=''>", unsafe_allow_html=True)
-    
-    # Klickbar titel för att välja story
-    if st.button(f"📝 {display_text[:60]}{'...' if len(display_text) > 60 else ''}", 
-                key=f"select_story_{sid}", 
-                use_container_width=True):
-        update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
-        st.session_state["active_story_id"] = sid
-        st.rerun()
-    
-    # Visa edit-kontroller om aktiverat
-    if show_edit_controls or st.session_state.get("show_story_controls", False):
-        with st.expander(f"Redigera Story {idx+1}", expanded=is_active):
-            col1, col2 = st.columns([4, 1])
-            
-            with col1:
-                text_val = st.text_area(
-                    "Text:",
-                    value=raw_text,
-                    key=f"story_text_{sid}",
-                    height=100,
-                    placeholder="Beskriv user story...",
-                )
-            
-            with col2:
-                st.write("")  # Spacing
-                if st.button("✖", key=f"del_{sid}", help="Ta bort story"):
-                    def delete_story(r, sid=sid):
-                        r["stories"] = [o for o in r["stories"] if o["id"] != sid]
-                        r.get("votes", {}).pop(sid, None)
-                        r.get("revealed_for", {}).pop(sid, None)
-                        if r.get("active_story_id") == sid:
-                            if r["stories"]:
-                                r["active_story_id"] = r["stories"][0]["id"]
-                            else:
-                                new_sid = uuid.uuid4().hex[:8]
-                                r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
-                                r["votes"].setdefault(new_sid, {})
-                                r["revealed_for"].setdefault(new_sid, False)
-                                r["active_story_id"] = new_sid
-                    update_room(room_code, delete_story)
-                    st.rerun()
-            
-            # Uppdatera texten om den ändrats
-            if text_val != raw_text:
-                def update_text(r, sid=sid, text_val=text_val):
-                    for obj in r["stories"]:
-                        if obj["id"] == sid:
-                            obj["text"] = text_val
-                            break
-                update_room(room_code, update_text)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+    with st.expander(f"{active_indicator}{story_title}", expanded=False):
+        col1, col2, col3 = st.columns([4, 1, 1])
+        
+        with col1:
+            text_val = st.text_area(
+                "Story text:",
+                value=raw_text,
+                key=f"story_text_{sid}",
+                height=100,
+                placeholder="Beskriv user story...",
+            )
+        
+        with col2:
+            if st.button("Välj för röstning", key=f"select_{sid}", use_container_width=True):
+                update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
+                st.session_state["active_story_id"] = sid
+                st.rerun()
+        
+        with col3:
+            if st.button("✖ Ta bort", key=f"del_{sid}", use_container_width=True):
+                def delete_story(r, sid=sid):
+                    r["stories"] = [o for o in r["stories"] if o["id"] != sid]
+                    r.get("votes", {}).pop(sid, None)
+                    r.get("revealed_for", {}).pop(sid, None)
+                    if r.get("active_story_id") == sid:
+                        if r["stories"]:
+                            r["active_story_id"] = r["stories"][0]["id"]
+                        else:
+                            new_sid = uuid.uuid4().hex[:8]
+                            r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
+                            r["votes"].setdefault(new_sid, {})
+                            r["revealed_for"].setdefault(new_sid, False)
+                            r["active_story_id"] = new_sid
+                update_room(room_code, delete_story)
+                st.rerun()
+        
+        # Uppdatera texten om den ändrats
+        if text_val != raw_text:
+            def update_text(r, sid=sid, text_val=text_val):
+                for obj in r["stories"]:
+                    if obj["id"] == sid:
+                        obj["text"] = text_val
+                        break
+                r["active_story_id"] = sid  # Sätt som aktiv när man redigerar
+            update_room(room_code, update_text)
+            st.session_state["active_story_id"] = sid
+            st.rerun()
 
 # No manual refresh needed; auto-refresh is enabled.
 
