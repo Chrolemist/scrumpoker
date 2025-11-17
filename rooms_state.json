@@ -1,0 +1,21 @@
+{
+  "TEAM1": {
+    "created": 1763377934.896931,
+    "story": "",
+    "scale": {
+      "XS": 1,
+      "S": 2,
+      "M": 3,
+      "L": 5,
+      "XL": 8
+    },
+    "votes": {},
+    "revealed": false,
+    "timer": {
+      "end": null,
+      "duration": 0
+    },
+    "players": [],
+    "last_update": 1763377934.896931
+  }
+}
