@@ -102,6 +102,7 @@ def update_room(room_code, mutate_fn):
         if migrate_room(rooms[room_code]):
             pass
         mutate_fn(rooms[room_code])
+        # bumpa en enkel versionsräknare vid varje ändring
         rooms[room_code]["last_update"] = time.time()
         # Ensure players is a unique list
         if isinstance(rooms[room_code].get("players"), set):
@@ -120,8 +121,9 @@ def get_room(room_code):
     return room
 
 # --- UI Helpers ---
-@st.cache_data(ttl=5)
-def cached_room(room_code, _ts):  # _ts to bust cache
+@st.cache_data(ttl=2)
+def cached_room(room_code, last_update):
+    """Cachad läsning av rum som kan invalidieras med last_update."""
     return get_room(room_code)
 
 CSS = """
@@ -202,14 +204,14 @@ if player_name != _prev_name:
                 pv[player_name] = val
     update_room(room_code, apply_rename)
 
-# --- Room bootstrap & autorefresh ---
+# --- Room bootstrap ---
 room = get_room(room_code)
 if not room:
     update_room(room_code, lambda r: r)
     room = get_room(room_code)
 
-# Auto-refresh all clients periodically
-st_autorefresh(interval=1500, key=f"refresh_{room_code}")
+# Enkel ändringsindikator i session_state för att trigga omritning vid behov
+st.session_state.setdefault("_room_version", 0)
 
 # --- Scale settings ---
 scale_section = st.sidebar.expander("Skala")
