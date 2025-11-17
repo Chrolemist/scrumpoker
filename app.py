@@ -466,40 +466,35 @@ with st.sidebar.expander("Chat", expanded=False):
     if st.session_state.pop("_reset_chat_emoji", False):
         st.session_state["chat_emoji_select"] = "—"
 
-    # Send form
-    with st.form(key="chat_form"):
-        chat_text = st.text_input("Skriv ett meddelande", key="chat_input", placeholder="Skriv ett meddelande…")
+    # Emoji selector outside form so it updates immediately
+    def _chat_append_emoji():
+        e = st.session_state.get("chat_emoji_select")
+        if e and e != "—":
+            st.session_state["_set_chat_input"] = (st.session_state.get("chat_input") or "") + e
+            st.session_state["_reset_chat_emoji"] = True
 
-        btn_emoji, btn_add, btn_send = st.columns([1, 0.6, 1])
-        with btn_emoji:
-            emoji_options = ["—", "😀", "😅", "😂", "🙌", "👍", "🎉", "❤️", "🔥", "🙏", "🚀", "🤔"]
-            st.selectbox("Emoji", options=emoji_options, index=0, key="chat_emoji_select", label_visibility="collapsed")
-        with btn_add:
-            add_emoji = st.form_submit_button("➕")
-        with btn_send:
-            sent = st.form_submit_button("Skicka")
+    col_emoji, _sp = st.columns([1, 1])
+    with col_emoji:
+        emoji_options = ["—", "😀", "😅", "😂", "🙌", "👍", "🎉", "❤️", "🔥", "🙏", "🚀", "🤔"]
+        st.selectbox("Emoji", options=emoji_options, index=0, key="chat_emoji_select", label_visibility="collapsed", on_change=_chat_append_emoji)
 
-        if add_emoji:
-            e = st.session_state.get("chat_emoji_select")
-            if e and e != "—":
-                st.session_state["_set_chat_input"] = (chat_text or "") + e
-                st.session_state["_reset_chat_emoji"] = True
+    # Input and send button
+    chat_text = st.text_input("Skriv ett meddelande", key="chat_input", placeholder="Skriv ett meddelande…")
+    sent = st.button("Skicka", key="chat_send_btn")
+    if sent:
+        msg = (chat_text or "").strip()
+        if not me:
+            st.warning("Ange ditt namn i sidopanelen innan du chattar.")
+        elif msg:
+            def append_msg(r):
+                lst = r.setdefault("chat", [])
+                lst.append({"name": me, "text": msg, "ts": time.time()})
+                # Trim to last 500 msgs to keep file small
+                if len(lst) > 500:
+                    del lst[:-500]
+            update_room(room_code, append_msg)
+            st.session_state["_clear_chat_input"] = True
             st.rerun()
-
-        if sent:
-            msg = (chat_text or "").strip()
-            if not me:
-                st.warning("Ange ditt namn i sidopanelen innan du chattar.")
-            elif msg:
-                def append_msg(r):
-                    lst = r.setdefault("chat", [])
-                    lst.append({"name": me, "text": msg, "ts": time.time()})
-                    # Trim to last 500 msgs to keep file small
-                    if len(lst) > 500:
-                        del lst[:-500]
-                update_room(room_code, append_msg)
-                st.session_state["_clear_chat_input"] = True
-                st.rerun()
 
 # --- Main content ---
 # Ensure player registered
