@@ -392,13 +392,23 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
     # Hämta om rummet direkt efter att meddelande skickats
     if st.session_state.get("_clear_chat_input", False):
         room = get_room(room_code)
+    # Hämta rumschat först
+    room_chat = (room.get("chat") or [])[-200:]
     # Om vi nyligen skickade ett meddelande kan en snapshot finnas i session_state;
-    # använd den för omedelbar render av bubblor så det inte dröjer tills rumsdata
+    # slå ihop snapshot med rumschat (lägg till eventuella saknade meddelanden)
     snap = st.session_state.get("_last_sent_chat_snapshot")
-    if snap is not None:
-        msgs = snap[-200:]
+    if snap:
+        # bygg en unik lista baserat på (ts, name, text)
+        seen = {(m.get("ts"), m.get("name"), m.get("text")) for m in room_chat}
+        merged = list(room_chat)
+        for s in snap:
+            key = (s.get("ts"), s.get("name"), s.get("text"))
+            if key not in seen:
+                merged.append(s)
+                seen.add(key)
+        msgs = merged[-200:]
     else:
-        msgs = (room.get("chat") or [])[-200:]
+        msgs = room_chat
     me = (st.session_state.get("player_name") or "").strip()
 
     # Messages list
