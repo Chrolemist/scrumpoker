@@ -5,3 +5,11 @@ backgroundColor = "#0E1014"
 secondaryBackgroundColor = "#1B1F29"
 textColor = "#FAFAFA"
 font = "sans serif"
+
+[theme.sidebar]
+backgroundColor = "#0E1014"
+textColor = "#FAFAFA"
+borderColor = "#2B2F3B"
+widgetBackgroundColor = "#1B1F29"
+widgetBorderColor = "#2B2F3B"
+skeletonBackgroundColor = "#151822"
