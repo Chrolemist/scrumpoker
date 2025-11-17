@@ -1,4 +1,5 @@
 import json, time, threading, uuid
+import os
 import shutil
 from html import escape
 from pathlib import Path
@@ -36,19 +37,49 @@ def load_rooms():
     return {}
 
 def save_rooms(rooms):
-    """Safely write rooms, keeping a backup of the previous state and using atomic replace."""
-    # write to temp file first
-    tmp = ROOMS_FILE.with_suffix(".json.tmp")
-    with tmp.open("w", encoding="utf-8") as f:
-        json.dump(rooms, f, ensure_ascii=False, indent=2)
-    # rotate backup
+    """Safely write rooms, keeping a backup of the previous state and using atomic replace.
+    Uses a unique temp file per write and fsync to reduce cross-process races.
+    """
+    # ensure parent directory exists
+    ROOMS_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+    # write to a unique temp file first
+    tmp = ROOMS_FILE.with_name(f"{ROOMS_FILE.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(rooms, f, ensure_ascii=False, indent=2)
+            try:
+                f.flush()
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+    except Exception:
+        # if even tmp write fails, try direct write as last resort
+        with ROOMS_FILE.open("w", encoding="utf-8") as f:
+            json.dump(rooms, f, ensure_ascii=False, indent=2)
+        return
+
+    # rotate backup (best-effort)
     try:
         if ROOMS_FILE.exists():
             shutil.copyfile(ROOMS_FILE, BACKUP_FILE)
     except Exception:
         pass
-    # atomic replace
-    tmp.replace(ROOMS_FILE)
+
+    # atomic replace or best-effort fallback
+    try:
+        os.replace(tmp, ROOMS_FILE)
+    except FileNotFoundError:
+        # source missing (rare race) — write directly
+        with ROOMS_FILE.open("w", encoding="utf-8") as f:
+            json.dump(rooms, f, ensure_ascii=False, indent=2)
+    except Exception:
+        try:
+            shutil.move(str(tmp), str(ROOMS_FILE))
+        except Exception:
+            # as last resort, attempt direct write
+            with ROOMS_FILE.open("w", encoding="utf-8") as f:
+                json.dump(rooms, f, ensure_ascii=False, indent=2)
 
 def init_room(rooms, room_code):
     if room_code not in rooms:
