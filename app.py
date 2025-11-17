@@ -458,9 +458,13 @@ with st.sidebar.expander("Chat", expanded=False):
     chat_html.append("</div>")
     st.markdown("\n".join(chat_html), unsafe_allow_html=True)
 
-    # Clear input on next run if flagged
+    # Clear or set input/select on next run if flagged (safe updates before widgets)
     if st.session_state.pop("_clear_chat_input", False):
         st.session_state["chat_input"] = ""
+    if "_set_chat_input" in st.session_state:
+        st.session_state["chat_input"] = st.session_state.pop("_set_chat_input")
+    if st.session_state.pop("_reset_chat_emoji", False):
+        st.session_state["chat_emoji_select"] = "—"
 
     # Send form
     with st.form(key="chat_form"):
@@ -478,8 +482,8 @@ with st.sidebar.expander("Chat", expanded=False):
         if add_emoji:
             e = st.session_state.get("chat_emoji_select")
             if e and e != "—":
-                st.session_state["chat_input"] = (chat_text or "") + e
-                st.session_state["chat_emoji_select"] = "—"
+                st.session_state["_set_chat_input"] = (chat_text or "") + e
+                st.session_state["_reset_chat_emoji"] = True
             st.rerun()
 
         if sent:
