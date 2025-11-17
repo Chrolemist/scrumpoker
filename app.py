@@ -151,7 +151,7 @@ body { overflow-x: hidden; }
 }
 
 /* Active story expander with RGB border */
-.active-story-expander {
+.active-story-wrapper div[data-testid="stExpander"] {
     border: 2px solid #6C5DD3;
     border-radius: 8px;
     padding: 4px;
@@ -367,13 +367,12 @@ for idx, story in enumerate(stories):
     # Visa story som expanderbar sektion (som sidomenyn)
     display_text = raw_text[:50] + "..." if len(raw_text) > 50 else raw_text
     story_title = display_text or f"User Story {idx+1}"
-    active_indicator = "⭐ " if is_active else ""
     
-    # Add CSS wrapper for active story RGB border
+    # Add CSS wrapper class for active story RGB border
     if is_active:
-        st.markdown('<div class="active-story-expander">', unsafe_allow_html=True)
+        st.markdown('<div class="active-story-wrapper">', unsafe_allow_html=True)
     
-    with st.expander(f"{active_indicator}{story_title}", expanded=False):
+    with st.expander(story_title, expanded=False):
         col1, col2, col3 = st.columns([4, 1, 1])
         
         with col1:
