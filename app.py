@@ -214,6 +214,9 @@ st.markdown(CSS, unsafe_allow_html=True)
 
 st.title("Scrum Poker")
 
+# Lightweight global sync so all clients see latest stories without manual refresh
+st_autorefresh(interval=4000, key="room_sync_refresh")
+
 # --- Sidebar setup ---
 st.sidebar.header("Inställningar")
 room_code = st.sidebar.text_input("Rumskod", value=st.session_state.get("room_code", "TEAM1"))
@@ -340,13 +343,25 @@ with st.sidebar.expander("Timer"):
     if col_t2.button("Stoppa timer"):
         update_room(room_code, lambda r: r.update(timer={"end": None, "duration": 0}))
 
+# Reveal / reset controls
+with st.sidebar.expander("Omröstning"):
+    col_r1, col_r2 = st.columns(2)
+    if col_r1.button("Reveal"):
+        def set_reveal(r):
+            sid = r.get("active_story_id")
+            r["revealed_for"][sid] = True
+        update_room(room_code, set_reveal)
+    if col_r2.button("Reset"):
+        def do_reset(r):
+            sid = r.get("active_story_id")
+            r["votes"][sid] = {}
+            r["revealed_for"][sid] = False
+        update_room(room_code, do_reset)
+
 # --- Chat (sidebar, bottom) ---
 with st.sidebar.expander("Chat", expanded=False):
-    # Live refresh toggle
-    st.session_state.setdefault("chat_live", True)
-    chat_live = st.checkbox("Live-uppdatera chatten", value=st.session_state["chat_live"], key="chat_live")
-    if chat_live:
-        st_autorefresh(interval=2000, key="chat_live_refresh")
+    # Always live-refresh chat at a light interval
+    st_autorefresh(interval=2000, key="chat_live_refresh")
     room = get_room(room_code)  # refresh to include any new messages
     msgs = (room.get("chat") or [])[-200:]
     me = (st.session_state.get("player_name") or "").strip()
@@ -390,21 +405,6 @@ with st.sidebar.expander("Chat", expanded=False):
                 update_room(room_code, append_msg)
                 st.session_state["_clear_chat_input"] = True
                 st.rerun()
-
-# Reveal / reset controls
-with st.sidebar.expander("Omröstning"):
-    col_r1, col_r2 = st.columns(2)
-    if col_r1.button("Reveal"):
-        def set_reveal(r):
-            sid = r.get("active_story_id")
-            r["revealed_for"][sid] = True
-        update_room(room_code, set_reveal)
-    if col_r2.button("Reset"):
-        def do_reset(r):
-            sid = r.get("active_story_id")
-            r["votes"][sid] = {}
-            r["revealed_for"][sid] = False
-        update_room(room_code, do_reset)
 
 # --- Main content ---
 # Ensure player registered
@@ -513,15 +513,7 @@ for idx, story in enumerate(stories):
                 update_room(room_code, delete_story)
                 st.rerun()
         
-        # Uppdatera texten om den ändrats
-        if text_val != raw_text:
-            def update_text(r, sid=sid, text_val=text_val):
-                for obj in r["stories"]:
-                    if obj["id"] == sid:
-                        obj["text"] = text_val
-                        break
-                r["active_story_id"] = sid  # Sätt som aktiv när man redigerar
-            update_room(room_code, update_text)
+        # Spara endast via "Spara"-knappen för tydligare UX
     
     # No closing needed; marker styles the immediate next expander
 
