@@ -185,34 +185,41 @@ room_code = st.sidebar.text_input("Rumskod", value=st.session_state.get("room_co
 if room_code != st.session_state.get("room_code"):
     st.session_state["room_code"] = room_code
 
-# Namn kan bara sättas första gången i denna webbläsare
-locked_name = st.session_state.get("player_name_locked", False)
+# Namn: ett aktivt namn per webbläsare, men det går att byta
 _prev_name = st.session_state.get("player_name", "")
-name_help = "Namnet låses när du har satt det." if not locked_name else "Namnet är låst för den här webbläsaren."
-player_name_input = st.sidebar.text_input("Ditt namn", value=_prev_name, help=name_help, disabled=locked_name)
+player_name_input = st.sidebar.text_input(
+    "Ditt namn",
+    value=_prev_name,
+    help="Du kan byta namn – röster följer med.",
+)
+player_name = player_name_input.strip()
 
-if not locked_name:
-    player_name = player_name_input.strip()
-    if player_name and player_name != _prev_name:
-        # uppdatera lokalt
-        st.session_state["player_name"] = player_name
-        st.session_state["player_name_locked"] = True
+if player_name != _prev_name:
+    # uppdatera lokalt
+    st.session_state["player_name"] = player_name
 
-        # propagara in i rummet (ingen senare ändring tillåts från denna klient)
-        def apply_rename(r):
-            # players list
-            if _prev_name and _prev_name in r["players"]:
-                r["players"] = [player_name if n == _prev_name else n for n in r["players"]]
-            if player_name and player_name not in r["players"]:
-                r["players"].append(player_name)
-            # votes across all stories
+    def apply_rename(r):
+        # ta bort tomma namn ur players-listan
+        r["players"] = [n for n in r.get("players", []) if n]
+
+        # byt namn i players-listan
+        if _prev_name and _prev_name in r["players"]:
+            r["players"] = [player_name if n == _prev_name else n for n in r["players"]]
+
+        # lägg till nytt namn om det inte redan finns och inte är tomt
+        if player_name and player_name not in r["players"]:
+            r["players"].append(player_name)
+
+        # flytta röster från gammalt namn till nytt
+        if _prev_name and player_name:
             for sid, pv in r.get("votes", {}).items():
-                if _prev_name and _prev_name in pv:
-                    val = pv.pop(_prev_name)
-                    pv[player_name] = val
-        update_room(room_code, apply_rename)
-else:
-    player_name = _prev_name
+                if _prev_name in pv and player_name not in pv:
+                    pv[player_name] = pv.pop(_prev_name)
+                elif _prev_name in pv:
+                    # om nya namnet redan hade en röst, ta bort den gamla för att undvika dubblett
+                    pv.pop(_prev_name, None)
+
+    update_room(room_code, apply_rename)
 
 # --- Room bootstrap ---
 room = get_room(room_code)
