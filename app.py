@@ -101,6 +101,8 @@ def init_room(rooms, room_code):
                 "duration": 0,
             },
             "players": [],
+            # transient pings: name -> unix ts
+            "pings": {},
             # chat: list of {name, text, ts}
             "chat": [],
             "last_update": time.time(),
@@ -135,6 +137,7 @@ def migrate_room(room: dict) -> bool:
     room.setdefault("votes", {})
     room.setdefault("revealed_for", {})
     room.setdefault("players", [])
+    room.setdefault("pings", {})
     room.setdefault("chat", [])
     # Ensure active story exists
     if not room["stories"]:
@@ -200,6 +203,16 @@ body { overflow-x: hidden; }
 .card-back { background: linear-gradient(135deg, #6C5DD3, #8E7BFF); transform: rotateY(180deg); box-shadow:0 0 12px rgba(120,80,255,0.6); }
 .card:hover .card-front { animation: rgbPulse 2s linear infinite; }
 @keyframes rgbPulse { 0% { box-shadow:0 0 8px #ff004c; } 33% { box-shadow:0 0 8px #00e1ff; } 66% { box-shadow:0 0 8px #7dff00; } 100% { box-shadow:0 0 8px #ff004c; } }
+.card.pinged .card-front { box-shadow:0 0 14px rgba(255,180,40,0.9); }
+@keyframes shake {
+    0% { transform: translateX(0) scale(1.06); }
+    20% { transform: translateX(-4px) scale(1.06); }
+    40% { transform: translateX(4px) scale(1.06); }
+    60% { transform: translateX(-3px) scale(1.06); }
+    80% { transform: translateX(3px) scale(1.06); }
+    100% { transform: translateX(0) scale(1.06); }
+}
+.card.pinged .card-inner { animation: shake 0.5s ease-in-out infinite; }
 .reveal-badge { background:#6C5DD3; padding:0.4rem 0.8rem; border-radius:6px; font-size:0.8rem; margin-left:0.5rem; }
 .consensus { color:#7dff00; font-weight:600; }
 .warning { color:#ffcc00; }
@@ -682,11 +695,27 @@ revealed = room.get("revealed_for", {}).get(active_sid, False)
 st.subheader("Kort")
 card_container = st.container()
 with card_container:
+    players_list = sorted(room.get("players", []))
+    # Clean out expired pings (older than 6s)
+    def _clean_pings(r):
+        now = time.time()
+        r["pings"] = {k: v for k, v in (r.get("pings", {}) or {}).items() if now - float(v) < 6}
+    update_room(room_code, _clean_pings)
+    room = get_room(room_code)
+    pings = room.get("pings", {})
+
     card_grid_html = ["<div class='card-grid'>"]
-    for p in sorted(room.get("players", [])):
+    for p in players_list:
         has_vote = p in all_votes
         val = all_votes.get(p, "?")
-        card_classes = "card flip" if revealed and has_vote else "card"
+        is_pinged = False
+        try:
+            ts = float(pings.get(p, 0))
+            is_pinged = (time.time() - ts) < 5
+        except Exception:
+            is_pinged = False
+        base_cls = "card flip" if revealed and has_vote else "card"
+        card_classes = (base_cls + (" pinged" if is_pinged else "")).strip()
         display_name = escape(str(p))
         name_class = "name long" if len(str(p)) > 12 else "name"
         front_content = f"<span class='{name_class}'>{display_name}</span>"
@@ -698,6 +727,17 @@ with card_container:
         card_grid_html.append(card_html)
     card_grid_html.append("</div>")
     st.markdown("".join(card_grid_html), unsafe_allow_html=True)
+
+    # Ping controls aligned per player
+    if players_list:
+        ping_cols = st.columns(len(players_list))
+        for idx, p in enumerate(players_list):
+            with ping_cols[idx]:
+                if st.button("🔔", key=f"ping_{p}", help=f"Pingga {p}"):
+                    def _set_ping(r, who=p):
+                        r.setdefault("pings", {})[who] = time.time()
+                    update_room(room_code, _set_ping)
+                    st.rerun()
 
 # Stats once revealed
 if revealed and all_votes:
