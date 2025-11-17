@@ -153,8 +153,8 @@ body { overflow-x: hidden; }
 }
 .story-row {
     border-radius:8px;
-    padding:0.35rem 0.5rem;
-    margin-bottom:0.25rem;
+    padding:0.15rem 0.3rem 0.1rem 0.3rem;
+    margin-bottom:0.1rem;
 }
 .story-row.active-story {
     background:rgba(108,93,211,0.16);
