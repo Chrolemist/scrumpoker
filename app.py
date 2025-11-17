@@ -766,7 +766,7 @@ with card_container:
     # Clean out expired pings (older than 6s)
     def _clean_pings(r):
         now = time.time()
-        r["pings"] = {k: v for k, v in (r.get("pings", {}) or {}).items() if now - float(v) < 6}
+        r["pings"] = {k: v for k, v in (r.get("pings", {}) or {}).items() if now - float(v) < 3}
     update_room(room_code, _clean_pings)
     room = get_room(room_code)
     pings = room.get("pings", {})
