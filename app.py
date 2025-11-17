@@ -184,24 +184,35 @@ st.sidebar.header("Inställningar")
 room_code = st.sidebar.text_input("Rumskod", value=st.session_state.get("room_code", "TEAM1"))
 if room_code != st.session_state.get("room_code"):
     st.session_state["room_code"] = room_code
+
+# Namn kan bara sättas första gången i denna webbläsare
+locked_name = st.session_state.get("player_name_locked", False)
 _prev_name = st.session_state.get("player_name", "")
-player_name = st.sidebar.text_input("Ditt namn", value=_prev_name)
-if player_name != _prev_name:
-    # update local state immediately
-    st.session_state["player_name"] = player_name
-    # propagate rename in room (autosave)
-    def apply_rename(r):
-        # players list
-        if _prev_name and _prev_name in r["players"]:
-            r["players"] = [player_name if n == _prev_name else n for n in r["players"]]
-        if player_name and player_name not in r["players"]:
-            r["players"].append(player_name)
-        # votes across all stories
-        for sid, pv in r.get("votes", {}).items():
-            if _prev_name and _prev_name in pv:
-                val = pv.pop(_prev_name)
-                pv[player_name] = val
-    update_room(room_code, apply_rename)
+name_help = "Namnet låses när du har satt det." if not locked_name else "Namnet är låst för den här webbläsaren."
+player_name_input = st.sidebar.text_input("Ditt namn", value=_prev_name, help=name_help, disabled=locked_name)
+
+if not locked_name:
+    player_name = player_name_input.strip()
+    if player_name and player_name != _prev_name:
+        # uppdatera lokalt
+        st.session_state["player_name"] = player_name
+        st.session_state["player_name_locked"] = True
+
+        # propagara in i rummet (ingen senare ändring tillåts från denna klient)
+        def apply_rename(r):
+            # players list
+            if _prev_name and _prev_name in r["players"]:
+                r["players"] = [player_name if n == _prev_name else n for n in r["players"]]
+            if player_name and player_name not in r["players"]:
+                r["players"].append(player_name)
+            # votes across all stories
+            for sid, pv in r.get("votes", {}).items():
+                if _prev_name and _prev_name in pv:
+                    val = pv.pop(_prev_name)
+                    pv[player_name] = val
+        update_room(room_code, apply_rename)
+else:
+    player_name = _prev_name
 
 # --- Room bootstrap ---
 room = get_room(room_code)
