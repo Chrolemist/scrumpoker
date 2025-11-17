@@ -287,6 +287,7 @@ if not room:
 
 # Enkel ändringsindikator i session_state för att trigga omritning vid behov
 st.session_state.setdefault("_room_version", 0)
+st.session_state.setdefault("chat_expanded", False)
 
 # --- Scale settings ---
 scale_section = st.sidebar.expander("Skala")
@@ -384,7 +385,7 @@ with st.sidebar.expander("Omröstning"):
         update_room(room_code, do_reset)
 
 # --- Chat (sidebar, bottom) ---
-with st.sidebar.expander("Chat", expanded=False):
+with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", False)):
     # Always live-refresh chat at a light interval
     st_autorefresh(interval=2000, key="chat_live_refresh")
     room = get_room(room_code)  # refresh to include any new messages
@@ -447,6 +448,8 @@ with st.sidebar.expander("Chat", expanded=False):
                     if len(lst) > 500:
                         del lst[:-500]
                 update_room(room_code, append_msg)
+                # Expand chat and clear input on next run so user sees the message
+                st.session_state["chat_expanded"] = True
                 st.session_state["_clear_chat_input"] = True
                 st.rerun()
 
