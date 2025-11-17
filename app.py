@@ -432,6 +432,8 @@ if end:
                 r["revealed_for"][sid] = True
             update_room(room_code, auto_reveal)
         st.success("⏱️ Tid slut - reveal!")
+    # uppdatera bara när timer är aktiv så nedräkningen syns
+    st_autorefresh(interval=1000, key=f"timer_refresh_{room_code}")
     st.markdown(f"<div class='timer'>⏱️ {remaining}s kvar</div>", unsafe_allow_html=True)
 else:
     st.markdown("<div class='timer'>⏱️ Ingen timer aktiv</div>", unsafe_allow_html=True)
