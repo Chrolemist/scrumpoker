@@ -282,7 +282,7 @@ body { overflow-x: hidden; }
 .reveal-badge { background:#6C5DD3; padding:0.4rem 0.8rem; border-radius:6px; font-size:0.8rem; margin-left:0.5rem; }
 .consensus { color:#7dff00; font-weight:600; }
 .warning { color:#ffcc00; }
-.timer { font-size:1.1rem; font-weight:600; display:inline-block; text-align:center; max-width:120px; }
+.timer { font-size:1rem; font-weight:600; display:inline-block; padding:0.3rem 0.6rem; background:rgba(108,93,211,0.15); border-radius:6px; white-space:nowrap; }
 /* Stories UI – tabell/lista utan extra kort */
 @keyframes rgbBorder { 
     0% { border-color: #ff004c; box-shadow: 0 0 10px rgba(255,0,76,0.5); } 
@@ -708,7 +708,7 @@ if end:
         st.success("Tid slut!")
     # uppdatera bara när timer är aktiv så nedräkningen syns
     st_autorefresh(interval=1000, key=f"timer_refresh_{room_code}")
-    st.markdown(f"<div class='timer'>⏱️ {remaining}s kvar</div>", unsafe_allow_html=True)
+    st.markdown(f"<span class='timer'>⏱️ {remaining}s</span>", unsafe_allow_html=True)
 
 # Voting interface
 st.subheader("Rösta")
