@@ -307,7 +307,7 @@ for idx, s in enumerate(stories):
         st.markdown(f"<div class='{cls}'>", unsafe_allow_html=True)
         cols = st.columns([7,1,1,1,1])
         # Compact text field with autosave
-        text_val = cols[0].text_input(" ", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="collapsed", placeholder="Beskriv user story...")
+        text_val = cols[0].text_input("", value=s.get("text", ""), key=f"story_text_{sid}", label_visibility="collapsed", placeholder="Beskriv user story...")
         if text_val != s.get("text", ""):
             def update_text(r):
                 for obj in r["stories"]:
@@ -373,6 +373,9 @@ for idx, s in enumerate(stories):
             stories = room.get("stories", [])
             active_sid = room.get("active_story_id")
         st.markdown("</div>", unsafe_allow_html=True)
+
+    # Close story list container
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # No manual refresh needed; auto-refresh is enabled.
 
