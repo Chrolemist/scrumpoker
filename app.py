@@ -771,14 +771,16 @@ with card_container:
     room = get_room(room_code)
     pings = room.get("pings", {})
 
-    # Render cards in rows of columns so ping button sits right below each card
+    # Render cards in a grid with 3 columns per row
     if players_list:
-        cols_per_row = min(6, max(1, len(players_list)))
-        for i in range(0, len(players_list), cols_per_row):
-            row_players = players_list[i:i+cols_per_row]
-            cols = st.columns(len(row_players))
-            for j, p in enumerate(row_players):
-                with cols[j]:
+        cols_per_row = 3
+        num_rows = (len(players_list) + cols_per_row - 1) // cols_per_row
+        for i in range(num_rows):
+            row_players = players_list[i*cols_per_row:(i+1)*cols_per_row]
+            cols = st.columns(cols_per_row)
+            for j in range(cols_per_row):
+                if j < len(row_players):
+                    p = row_players[j]
                     has_vote = p in all_votes
                     val = all_votes.get(p, "?")
                     is_pinged = False
@@ -799,12 +801,16 @@ with card_container:
                         f"<div class='card-face card-back'>{back_content}</div>"
                         f"</div></div>"
                     )
-                    st.markdown(card_html, unsafe_allow_html=True)
-                    if st.button("🔔", key=f"ping_{p}", help=f"Pingga {p}", use_container_width=True):
-                        def _set_ping(r, who=p):
-                            r.setdefault("pings", {})[who] = time.time()
-                        update_room(room_code, _set_ping)
-                        st.rerun()
+                    with cols[j]:
+                        st.markdown(card_html, unsafe_allow_html=True)
+                        if st.button("🔔", key=f"ping_{p}", help=f"Pingga {p}", use_container_width=True):
+                            def _set_ping(r, who=p):
+                                r.setdefault("pings", {})[who] = time.time()
+                            update_room(room_code, _set_ping)
+                            st.rerun()
+                else:
+                    with cols[j]:
+                        st.markdown("", unsafe_allow_html=True)
 
 # Stats once revealed
 if revealed and all_votes:
