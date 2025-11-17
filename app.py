@@ -161,23 +161,17 @@ body { overflow-x: hidden; }
     height:32px;
     font-size:0.8rem;
 }
-.story-card {
+.story-row textarea {
     background:#0E1014;
     border:1px solid #2b2f3b;
     border-radius:8px;
-    padding:0.5rem 0.75rem;
     color:#f0f0f4;
-    min-height:64px;
-    white-space:pre-wrap;
+    min-height:80px;
 }
-.story-card.active-card {
+.story-row.active-story textarea {
     border-color:#6C5DD3;
     background:rgba(108,93,211,0.08);
     box-shadow:0 0 0 2px #6C5DD3, 0 0 16px rgba(108,93,211,0.8);
-}
-.story-card.empty-card {
-    opacity:0.7;
-    font-style:italic;
 }
 </style>
 """
@@ -373,31 +367,25 @@ for idx, s in enumerate(stories):
     sid = s["id"]
     is_active = sid == active_sid
     raw_text = s.get("text", "")
-
-    cols = st.columns([8, 1, 1])
-
-    # Eget story-kort där RGB/glow kan ligga exakt runt texten
-    card_classes = ["story-card"]
-    display_text = raw_text or "Beskriv user story..."
-    if not raw_text:
-        card_classes.append("empty-card")
-    if is_active:
-        card_classes.append("active-card")
+    
+    # Lägg active-story klass på raden för textarea-styling
+    row_class = "story-row active-story" if is_active else "story-row"
+    
+    with st.container():
+        st.markdown(f"<div class='{row_class}'>", unsafe_allow_html=True)
+        
+        cols = st.columns([8, 1, 1])
 
     with cols[0]:
-            # Visa storyn som ett stylat kort
-            st.markdown(
-                f"<div class='{' '.join(card_classes)}'>{display_text}</div>",
-                unsafe_allow_html=True,
-            )
-            # Textarea för redigering under kortet
-            text_val = st.text_area(
-                "",
-                value=raw_text,
-                key=f"story_text_{sid}",
-                label_visibility="collapsed",
-                height=90,
-            )
+        # Textarea för redigering (ser ut som story-kortet med RGB-ram)
+        text_val = st.text_area(
+            "",
+            value=raw_text,
+            key=f"story_text_{sid}",
+            label_visibility="collapsed",
+            height=90,
+            placeholder="Beskriv user story...",
+        )
 
     if cols[1].button("Välj", key=f"select_{sid}"):
         update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
@@ -423,6 +411,8 @@ for idx, s in enumerate(stories):
         room = get_room(room_code)
         stories = room.get("stories", [])
         active_sid = room.get("active_story_id")
+        
+        st.markdown("</div>", unsafe_allow_html=True)
 
     if text_val != raw_text:
         def update_text(r, sid=sid, text_val=text_val):
