@@ -582,19 +582,24 @@ for idx, story in enumerate(stories):
         col1, col2, col3 = st.columns([4, 1, 1])
         
         with col1:
+            # Use session_state to persist edits across reruns (avoid value= which overwrites user typing)
+            st_key = f"story_text_{sid}"
+            if st_key not in st.session_state:
+                # initialize once from room text
+                st.session_state[st_key] = raw_text or ""
             text_val = st.text_area(
                 "Story text:",
-                value=raw_text,
-                key=f"story_text_{sid}",
+                key=st_key,
                 height=100,
                 placeholder="Beskriv user story...",
             )
             # Save button saves the text and collapses the expander
             if st.button("Spara", key=f"save_{sid}", use_container_width=True):
-                def save_text(r, sid=sid, text_val=text_val):
+                def save_text(r, sid=sid, text_val=None):
                     for obj in r["stories"]:
                         if obj["id"] == sid:
-                            obj["text"] = text_val
+                            # read from session_state to ensure latest typed value
+                            obj["text"] = st.session_state.get(f"story_text_{sid}", text_val if text_val is not None else "")
                             break
                 # Debugging: show current state before save in sidebar if enabled
                 if st.sidebar.checkbox("Debug: story save", key=f"dbg_save_{sid}"):
