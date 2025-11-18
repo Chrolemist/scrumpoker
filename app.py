@@ -629,6 +629,9 @@ for idx, story in enumerate(stories):
                 height=100,
                 placeholder="Beskriv user story...",
             )
+            # Debug checkbox for story save (register once per story)
+            dbg_save = st.sidebar.checkbox("Debug: story save", key=f"dbg_save_{sid}")
+
             # Save button saves the text and collapses the expander
             if st.button("Spara", key=f"save_{sid}", use_container_width=True):
                 def save_text(r, sid=sid, text_val=None):
@@ -638,13 +641,13 @@ for idx, story in enumerate(stories):
                             obj["text"] = st.session_state.get(f"story_text_{sid}", text_val if text_val is not None else "")
                             break
                 # Debugging: show current state before save in sidebar if enabled
-                if st.sidebar.checkbox("Debug: story save", key=f"dbg_save_{sid}"):
+                if dbg_save:
                     st.sidebar.write("DEBUG before save_text:")
                     st.sidebar.write(get_room(room_code).get("stories", []))
                     st.sidebar.write("Saving text for:", sid)
                     st.sidebar.write(text_val)
                 update_room(room_code, save_text)
-                if st.sidebar.checkbox("Debug: story save", key=f"dbg_save_{sid}"):
+                if dbg_save:
                     st.sidebar.write("DEBUG after save_text:")
                     st.sidebar.write(get_room(room_code).get("stories", []))
                 st.session_state["expanded_story_id"] = None
