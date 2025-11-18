@@ -631,7 +631,13 @@ for idx, story in enumerate(stories):
         # Spara endast via "Spara"-knappen för tydligare UX
     
     # No closing needed; marker styles the immediate next expander
-
+# Debug: visa stories-data om flagga är satt
+if st.sidebar.checkbox("Visa story-debug (rå data)", value=False, key="story_debug"):
+    st.sidebar.markdown("**DEBUG: stories för rummet**")
+    st.sidebar.write(get_room(room_code).get("stories", []))
+    st.sidebar.markdown("**DEBUG: session keys för story-textarea**")
+    keys = {k: v for k, v in st.session_state.items() if k.startswith("story_text_")}
+    st.sidebar.write(keys)
 # No manual refresh needed; auto-refresh is enabled.
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
