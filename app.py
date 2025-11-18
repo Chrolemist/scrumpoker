@@ -229,7 +229,24 @@ st.markdown(CSS, unsafe_allow_html=True)
 st.title("Scrum Poker")
 
 # Lightweight global sync so all clients see latest stories without manual refresh
-st_autorefresh(interval=4000, key="room_sync_refresh")
+# Pause global refresh while user is actively typing in any story (`story_text_*`),
+# to avoid overwriting input on re-run.
+def _editing_in_progress():
+    for k, v in st.session_state.items():
+        if k.startswith("story_text_") and isinstance(v, str) and v.strip() != "":
+            return True
+    return False
+
+if not _editing_in_progress():
+    st_autorefresh(interval=4000, key="room_sync_refresh")
+else:
+    # Show a small hint and let user resume sync if needed
+    col_a, col_b = st.columns([4, 1])
+    with col_a:
+        st.info("Auto-refresh pausad — du redigerar en story. Klicka Fortsätt för att återaktivera.")
+    with col_b:
+        if st.button("Fortsätt"):
+            st_autorefresh(interval=4000, key="room_sync_refresh")
 
 # --- Sidebar setup ---
 st.sidebar.header("Inställningar")
