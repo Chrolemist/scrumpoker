@@ -253,8 +253,14 @@ st.session_state.setdefault("play_state", "idle")  # idle | countdown | active
 st.session_state.setdefault("play_countdown_end", None)
 
 def _start_play_countdown():
+    # If countdown disabled, go straight to active play
+    if not st.session_state.get("play_countdown_enabled", True):
+        st.session_state["play_state"] = "active"
+        st.session_state["play_countdown_end"] = None
+        return
+    dur = int(st.session_state.get("play_countdown_duration", 3) or 3)
     st.session_state["play_state"] = "countdown"
-    st.session_state["play_countdown_end"] = time.time() + 3  # 3 seconds
+    st.session_state["play_countdown_end"] = time.time() + max(1, min(10, dur))
 
 def _end_play():
     st.session_state["play_state"] = "idle"
@@ -295,8 +301,9 @@ def _editing_in_progress():
             return True
     return False
 
-# Always enable auto-refresh — do not pause while editing stories.
-st_autorefresh(interval=4000, key="room_sync_refresh")
+# Enable global room sync autorefresh except during the short play countdown
+if st.session_state.get("play_state", "idle") != "countdown":
+    st_autorefresh(interval=4000, key="room_sync_refresh")
 
 # --- Sidebar setup ---
 st.sidebar.header("Inställningar")
@@ -345,6 +352,13 @@ if player_name != _prev_name:
                     pv.pop(_prev_name, None)
 
     update_room(room_code, apply_rename)
+
+# Play countdown settings in sidebar
+st.session_state.setdefault("play_countdown_enabled", True)
+st.session_state.setdefault("play_countdown_duration", 3)
+with st.sidebar.expander("Play-inställningar", expanded=False):
+    st.checkbox("Använd nedräkning vid Play", value=st.session_state.get("play_countdown_enabled", True), key="play_countdown_enabled")
+    st.slider("Nedräkning (sekunder)", min_value=1, max_value=10, value=st.session_state.get("play_countdown_duration", 3), key="play_countdown_duration")
 
 # --- Room bootstrap ---
 room = get_room(room_code)
