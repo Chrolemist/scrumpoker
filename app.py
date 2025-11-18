@@ -13,7 +13,20 @@ import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
 # All data lagras i minnet under sessionen
-ROOMS = {}
+# Persist rooms in Streamlit `server_state` when available so data survives
+# reruns and is shared between clients. Fall back to a session_state key
+# when `server_state` isn't available (compatible with older Streamlit).
+try:
+    server_state = st.session_state.server_state
+except Exception:
+    # Fallback: store rooms under a reserved session_state key
+    if "_server_state_rooms" not in st.session_state:
+        st.session_state["_server_state_rooms"] = {}
+    ROOMS = st.session_state["_server_state_rooms"]
+else:
+    if "rooms" not in server_state:
+        server_state["rooms"] = {}
+    ROOMS = server_state["rooms"]
 
 DEFAULT_TSHIRT = ["XS", "S", "M", "L", "XL"]
 DEFAULT_SCALE = {"XS": 1, "S": 2, "M": 3, "L": 5, "XL": 8}
