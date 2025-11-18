@@ -278,6 +278,9 @@ st.markdown(
     .play-exit-btn { position:fixed; top:12px; right:18px; z-index:1000; }
     .play-wait-overlay { position:fixed; top:0; left:0; right:0; bottom:0; backdrop-filter: blur(5px); background:rgba(20,22,28,0.55); z-index:998; display:flex; align-items:center; justify-content:center; flex-direction:column; }
     .play-wait-overlay .msg { font-size:1.4rem; color:#e6e8f0; text-shadow:0 0 10px #6C5DD3; }
+    .play-story-box { background: linear-gradient(135deg, rgba(44,47,57,0.95), rgba(36,38,46,0.95)); border-radius:12px; padding:28px 26px; box-shadow: 0 8px 30px rgba(0,0,0,0.45); color:#fff; max-width:900px; text-align:left; }
+    .play-story-box h1 { margin:0 0 8px 0; font-size:2.2rem; letter-spacing:0.6px; }
+    .play-story-box p { margin:0; font-size:1.15rem; color:#e6e8f0; line-height:1.45; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -703,12 +706,23 @@ else:
         # Focused play UI
         active_obj = next((s for s in stories if s["id"] == active_sid), None)
         story_text = (active_obj.get("text") if active_obj else "") or "(Ingen text)"
-        st.markdown(f"### Aktiv Story\n{escape(story_text)}")
+        # Render a prominent story box separated from other UI
+        st.markdown(
+            f"""
+            <div class='play-focused'>
+              <div class='play-story-box'>
+                <h1>Aktiv Story</h1>
+                <p>{escape(story_text)}</p>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         # Exit button
         if st.button("Avsluta Play", key="play_exit", help="Återgå till alla stories"):
             _end_play()
             st.rerun()
-        # If no timer: show wait blur until all voted
+        # If no timer: show wait hint until all voted
         room_now = get_room(room_code)
         timer_end = room_now.get("timer", {}).get("end")
         if not timer_end and not _all_have_voted(room_now):
