@@ -710,14 +710,8 @@ else:
         room_now = get_room(room_code)
         timer_end = room_now.get("timer", {}).get("end")
         if not timer_end and not _all_have_voted(room_now):
-            st.markdown(
-                """
-                <div class='play-wait-overlay'>
-                  <div class='msg'>Väntar på alla röster…</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            # Show a subtle non-blocking hint while waiting so voting UI remains interactive
+            st.info("Väntar på alla röster…")
         # (Rest of UI below continues: voting interface, cards, timer handled later sections.)
 # Story debug removed
 # No manual refresh needed; auto-refresh is enabled.
