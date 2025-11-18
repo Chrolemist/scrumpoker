@@ -247,6 +247,41 @@ st.markdown(CSS, unsafe_allow_html=True)
 
 st.title("Scrum Poker")
 
+# --- Play Mode State & Helpers ---
+st.session_state.setdefault("play_state", "idle")  # idle | countdown | active
+st.session_state.setdefault("play_countdown_end", None)
+
+def _start_play_countdown():
+    st.session_state["play_state"] = "countdown"
+    st.session_state["play_countdown_end"] = time.time() + 3  # 3 seconds
+
+def _end_play():
+    st.session_state["play_state"] = "idle"
+    st.session_state["play_countdown_end"] = None
+
+def _all_have_voted(room):
+    sid = room.get("active_story_id")
+    votes = room.get("votes", {}).get(sid, {})
+    players = [p for p in (room.get("players") or []) if p]
+    return len(players) > 0 and len(votes) == len(players)
+
+# Extra CSS for play overlays
+st.markdown(
+    """
+    <style>
+    .play-overlay { position:fixed; top:0; left:0; right:0; bottom:0; backdrop-filter: blur(6px); background:rgba(20,22,28,0.50); z-index:999; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+    .play-count { font-size:4rem; color:#fff; text-shadow:0 0 16px #6C5DD3; margin-bottom:1rem; }
+    .play-info { font-size:1.2rem; color:#cfcff7; }
+    .play-focused { max-width:1100px; margin:0 auto; }
+    .play-focused .block-container { padding-top:0 !important; }
+    .play-exit-btn { position:fixed; top:12px; right:18px; z-index:1000; }
+    .play-wait-overlay { position:fixed; top:0; left:0; right:0; bottom:0; backdrop-filter: blur(5px); background:rgba(20,22,28,0.55); z-index:998; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+    .play-wait-overlay .msg { font-size:1.4rem; color:#e6e8f0; text-shadow:0 0 10px #6C5DD3; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Lightweight global sync so all clients see latest stories without manual refresh
 # Pause global refresh while user is actively typing in any story (`story_text_*`),
 # to avoid overwriting input on re-run.
@@ -575,77 +610,115 @@ if active_obj and not (active_obj.get("text", "").strip()):
 stories = room.get("stories", [])
 active_sid = room.get("active_story_id")
 
-# Visa alla stories som expanderbara kort
-for idx, story in enumerate(stories):
-    sid = story["id"]
-    is_active = sid == active_sid
-    raw_text = story.get("text", "")
-    
-    # Visa story som expanderbar sektion (som sidomenyn)
-    story_title = (raw_text or "").strip() or f"User Story {idx+1}"
-    
-    # Insert a marker so CSS can add an inline badge in the header
-    if is_active:
-        st.markdown('<div class="active-expander-marker"></div>', unsafe_allow_html=True)
+# --- Play Mode Rendering Logic ---
+play_state = st.session_state.get("play_state")
 
-    with st.expander(story_title, expanded=(sid == st.session_state.get("expanded_story_id", active_sid))):
-        col1, col2, col3 = st.columns([4, 1, 1])
-        
-        with col1:
-            # Use session_state to persist edits across reruns (avoid value= which overwrites user typing)
-            st_key = f"story_text_{sid}"
-            if st_key not in st.session_state:
-                # initialize once from room text
-                st.session_state[st_key] = raw_text or ""
-            text_val = st.text_area(
-                "Story text:",
-                key=st_key,
-                height=100,
-                placeholder="Beskriv user story...",
-            )
-            # Save button saves the text and collapses the expander
-            if st.button("Spara", key=f"save_{sid}", use_container_width=True):
-                def save_text(r, sid=sid, text_val=None):
-                    for obj in r["stories"]:
-                        if obj["id"] == sid:
-                            # read from session_state to ensure latest typed value
-                            obj["text"] = st.session_state.get(f"story_text_{sid}", text_val if text_val is not None else "")
-                            break
-                update_room(room_code, save_text)
-                st.session_state["expanded_story_id"] = None
-                st.rerun()
-        
-        with col2:
+if play_state == "countdown":
+    # Countdown overlay & progress
+    end_ct = st.session_state.get("play_countdown_end") or time.time()
+    remaining = int(end_ct - time.time())
+    if remaining <= 0:
+        st.session_state["play_state"] = "active"
+        st.session_state["play_countdown_end"] = None
+        st.rerun()
+    else:
+        st_autorefresh(interval=1000, key="play_countdown_refresh")
+        st.markdown(
+            f"""
+            <div class='play-overlay'>
+              <div class='play-count'>{remaining}</div>
+              <div class='play-info'>Startar röstning…</div>
+              <div style='margin-top:1.5rem;'>
+                <button style='background:#6C5DD3;border:none;padding:10px 18px;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;' onclick='window.location.reload()'>Avbryt</button>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+else:
+    if play_state == "idle":
+        # Normal full stories list UI
+        for idx, story in enumerate(stories):
+            sid = story["id"]
+            is_active = sid == active_sid
+            raw_text = story.get("text", "")
+            story_title = (raw_text or "").strip() or f"User Story {idx+1}"
             if is_active:
-                st.button("Vald ✓", key=f"selected_{sid}", use_container_width=True, disabled=True)
-            else:
-                if st.button("Välj för röstning", key=f"select_{sid}", use_container_width=True):
-                    update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
-                    st.session_state["active_story_id"] = sid
-                    st.session_state["expanded_story_id"] = sid
-                    st.rerun()
-        
-        with col3:
-            if st.button("✖ Ta bort", key=f"del_{sid}", use_container_width=True):
-                def delete_story(r, sid=sid):
-                    r["stories"] = [o for o in r["stories"] if o["id"] != sid]
-                    r.get("votes", {}).pop(sid, None)
-                    r.get("revealed_for", {}).pop(sid, None)
-                    if r.get("active_story_id") == sid:
-                        if r["stories"]:
-                            r["active_story_id"] = r["stories"][0]["id"]
-                        else:
-                            new_sid = uuid.uuid4().hex[:8]
-                            r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
-                            r["votes"].setdefault(new_sid, {})
-                            r["revealed_for"].setdefault(new_sid, False)
-                            r["active_story_id"] = new_sid
-                update_room(room_code, delete_story)
+                st.markdown('<div class="active-expander-marker"></div>', unsafe_allow_html=True)
+            with st.expander(story_title, expanded=(sid == st.session_state.get("expanded_story_id", active_sid))):
+                col1, col2, col3 = st.columns([4, 1, 1])
+                with col1:
+                    st_key = f"story_text_{sid}"
+                    if st_key not in st.session_state:
+                        st.session_state[st_key] = raw_text or ""
+                    text_val = st.text_area(
+                        "Story text:",
+                        key=st_key,
+                        height=100,
+                        placeholder="Beskriv user story...",
+                    )
+                    if st.button("Spara", key=f"save_{sid}", use_container_width=True):
+                        def save_text(r, sid=sid, text_val=None):
+                            for obj in r["stories"]:
+                                if obj["id"] == sid:
+                                    obj["text"] = st.session_state.get(f"story_text_{sid}", text_val if text_val is not None else "")
+                                    break
+                        update_room(room_code, save_text)
+                        st.session_state["expanded_story_id"] = None
+                        st.rerun()
+                with col2:
+                    if is_active:
+                        st.button("Vald ✓", key=f"selected_{sid}", use_container_width=True, disabled=True)
+                    else:
+                        if st.button("Välj för röstning", key=f"select_{sid}", use_container_width=True):
+                            update_room(room_code, lambda r, sid=sid: r.update(active_story_id=sid))
+                            st.session_state["active_story_id"] = sid
+                            st.session_state["expanded_story_id"] = sid
+                            st.rerun()
+                with col3:
+                    if st.button("✖ Ta bort", key=f"del_{sid}", use_container_width=True):
+                        def delete_story(r, sid=sid):
+                            r["stories"] = [o for o in r["stories"] if o["id"] != sid]
+                            r.get("votes", {}).pop(sid, None)
+                            r.get("revealed_for", {}).pop(sid, None)
+                            if r.get("active_story_id") == sid:
+                                if r["stories"]:
+                                    r["active_story_id"] = r["stories"][0]["id"]
+                                else:
+                                    new_sid = uuid.uuid4().hex[:8]
+                                    r["stories"].append({"id": new_sid, "text": "", "created": time.time()})
+                                    r["votes"].setdefault(new_sid, {})
+                                    r["revealed_for"].setdefault(new_sid, False)
+                                    r["active_story_id"] = new_sid
+                        update_room(room_code, delete_story)
+                        st.rerun()
+        # Play button (only when an active story exists)
+        if active_sid:
+            if st.button("▶ Play", key="play_start", type="primary"):
+                _start_play_countdown()
                 st.rerun()
-        
-        # Spara endast via "Spara"-knappen för tydligare UX
-    
-    # No closing needed; marker styles the immediate next expander
+    elif play_state == "active":
+        # Focused play UI
+        active_obj = next((s for s in stories if s["id"] == active_sid), None)
+        story_text = (active_obj.get("text") if active_obj else "") or "(Ingen text)"
+        st.markdown(f"### Aktiv Story\n{escape(story_text)}")
+        # Exit button
+        if st.button("Avsluta Play", key="play_exit", help="Återgå till alla stories"):
+            _end_play()
+            st.rerun()
+        # If no timer: show wait blur until all voted
+        room_now = get_room(room_code)
+        timer_end = room_now.get("timer", {}).get("end")
+        if not timer_end and not _all_have_voted(room_now):
+            st.markdown(
+                """
+                <div class='play-wait-overlay'>
+                  <div class='msg'>Väntar på alla röster…</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        # (Rest of UI below continues: voting interface, cards, timer handled later sections.)
 # Story debug removed
 # No manual refresh needed; auto-refresh is enabled.
 st.markdown("<br>", unsafe_allow_html=True)
