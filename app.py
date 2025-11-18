@@ -128,9 +128,15 @@ def get_room(room_code):
     return room
 
 # --- UI Helpers ---
-@st.cache_data(ttl=2)
 def cached_room(room_code, last_update):
-    """Cachad läsning av rum som kan invalidieras med last_update."""
+    """Returnerar rummet utan Streamlit-cache.
+
+    OBS: Vi undviker @st.cache_data här eftersom kombinationen
+    cache + `st_autorefresh` + globalt RAM-lagrade `ROOMS` kan
+    leda till att användare ser föråldrad eller tom data.
+    Ta bort cachen så att varje rerun läser den senaste versionen
+    från den i-minnet lagrade `ROOMS`.
+    """
     return get_room(room_code)
 
 CSS = """
