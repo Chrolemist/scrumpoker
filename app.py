@@ -256,16 +256,21 @@ def _editing_in_progress():
             return True
     return False
 
-if not _editing_in_progress():
+if not _editing_in_progress() or st.session_state.get("force_room_sync", False):
+    # If user pressed 'Fortsätt' we set `force_room_sync` for one run.
     st_autorefresh(interval=4000, key="room_sync_refresh")
+    if st.session_state.get("force_room_sync", False):
+        # Clear the flag so it doesn't persist indefinitely
+        st.session_state["force_room_sync"] = False
 else:
     # Show a small hint and let user resume sync if needed
     col_a, col_b = st.columns([4, 1])
     with col_a:
         st.info("Auto-refresh pausad — du redigerar en story. Klicka Fortsätt för att återaktivera.")
     with col_b:
+        # When pressed, set a flag so the next rerun enables autorefresh
         if st.button("Fortsätt"):
-            st_autorefresh(interval=4000, key="room_sync_refresh")
+            st.session_state["force_room_sync"] = True
 
 # --- Sidebar setup ---
 st.sidebar.header("Inställningar")
@@ -504,8 +509,6 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
         emoji_options = ["—", "😀", "😅", "😂", "🙌", "👍", "🎉", "❤️", "🔥", "🙏", "🚀", "🤔"]
         st.selectbox("Emoji", options=emoji_options, index=0, key="chat_emoji_select", label_visibility="collapsed", on_change=_chat_append_emoji)
 
-    # Debug checkbox to help troubleshoot chat updates
-    chat_debug = st.checkbox("Visa chat-debug (rå data)", value=False, key="chat_debug")
 
     # Input and send (Enter submits the form)
     with st.form(key="chat_form", clear_on_submit=True):
@@ -539,23 +542,7 @@ with st.sidebar.expander("Chat", expanded=st.session_state.get("chat_expanded", 
                     st.session_state[local_key] = hist
                 st.rerun()
 
-    # If debug enabled, show raw chat data or the last sent snapshot so it doesn't blink
-    if st.session_state.get("chat_debug"):
-        st.markdown("**DEBUG: senaste meddelanden (rå data / snapshot)**")
-        snap = st.session_state.get("_last_sent_chat_snapshot")
-        if snap is not None:
-            st.write(snap)
-        else:
-            st.write(room.get("chat", [])[-20:])
-        # Extra debug: visa nycklar och duplicat-räkning i kombinerad lista
-        combined_key = f"chat_combined_{room_code}"
-        combined = st.session_state.get(combined_key, [])
-        keys = [(m.get("ts"), m.get("name"), m.get("text")) for m in combined]
-        from collections import Counter
-        cnt = Counter(keys)
-        dupes = {k: v for k, v in cnt.items() if v > 1}
-        st.markdown("**DEBUG: combined keys (count) — dubbletter:**")
-        st.write(dupes)
+    # Chat debug removed in production
 
 # --- Main content ---
 # Ensure player registered (lägg alltid till namnet, även anonymt)
