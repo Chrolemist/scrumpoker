@@ -596,7 +596,16 @@ for idx, story in enumerate(stories):
                         if obj["id"] == sid:
                             obj["text"] = text_val
                             break
+                # Debugging: show current state before save in sidebar if enabled
+                if st.sidebar.checkbox("Debug: story save", key=f"dbg_save_{sid}"):
+                    st.sidebar.write("DEBUG before save_text:")
+                    st.sidebar.write(get_room(room_code).get("stories", []))
+                    st.sidebar.write("Saving text for:", sid)
+                    st.sidebar.write(text_val)
                 update_room(room_code, save_text)
+                if st.sidebar.checkbox("Debug: story save", key=f"dbg_save_{sid}"):
+                    st.sidebar.write("DEBUG after save_text:")
+                    st.sidebar.write(get_room(room_code).get("stories", []))
                 st.session_state["expanded_story_id"] = None
                 st.rerun()
         
