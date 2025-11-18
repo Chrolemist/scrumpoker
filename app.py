@@ -245,7 +245,8 @@ body { overflow-x: hidden; }
 st.set_page_config(page_title="Scrum Poker", page_icon="🃏", layout="wide")
 st.markdown(CSS, unsafe_allow_html=True)
 
-st.title("Scrum Poker")
+if st.session_state.get("play_state", "idle") == "idle":
+    st.title("Scrum Poker")
 
 # --- Play Mode State & Helpers ---
 st.session_state.setdefault("play_state", "idle")  # idle | countdown | active
@@ -582,17 +583,18 @@ active_sid = room.get("active_story_id")
 if "expanded_story_id" not in st.session_state:
     st.session_state["expanded_story_id"] = active_sid
 
-# New story button (no title required)
-if st.button("+ Ny story"):
-    def add_story(r):
-        sid = uuid.uuid4().hex[:8]
-        r["stories"].append({"id": sid, "text": "", "created": time.time()})
-        r["votes"].setdefault(sid, {})
-        r["revealed_for"].setdefault(sid, False)
-    update_room(room_code, add_story)
-    room = get_room(room_code)
-    stories = room.get("stories", [])
-    active_sid = room.get("active_story_id")
+# New story button (hidden during play mode)
+if st.session_state.get("play_state", "idle") == "idle":
+    if st.button("+ Ny story"):
+        def add_story(r):
+            sid = uuid.uuid4().hex[:8]
+            r["stories"].append({"id": sid, "text": "", "created": time.time()})
+            r["votes"].setdefault(sid, {})
+            r["revealed_for"].setdefault(sid, False)
+        update_room(room_code, add_story)
+        room = get_room(room_code)
+        stories = room.get("stories", [])
+        active_sid = room.get("active_story_id")
 
 # Om aktiv story är tom och det finns en icke-tom, välj en med text
 stories = room.get("stories", [])
