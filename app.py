@@ -256,21 +256,8 @@ def _editing_in_progress():
             return True
     return False
 
-if not _editing_in_progress() or st.session_state.get("force_room_sync", False):
-    # If user pressed 'Fortsätt' we set `force_room_sync` for one run.
-    st_autorefresh(interval=4000, key="room_sync_refresh")
-    if st.session_state.get("force_room_sync", False):
-        # Clear the flag so it doesn't persist indefinitely
-        st.session_state["force_room_sync"] = False
-else:
-    # Show a small hint and let user resume sync if needed
-    col_a, col_b = st.columns([4, 1])
-    with col_a:
-        st.info("Auto-refresh pausad — du redigerar en story. Klicka Fortsätt för att återaktivera.")
-    with col_b:
-        # When pressed, set a flag so the next rerun enables autorefresh
-        if st.button("Fortsätt"):
-            st.session_state["force_room_sync"] = True
+# Always enable auto-refresh — do not pause while editing stories.
+st_autorefresh(interval=4000, key="room_sync_refresh")
 
 # --- Sidebar setup ---
 st.sidebar.header("Inställningar")
@@ -616,9 +603,6 @@ for idx, story in enumerate(stories):
                 height=100,
                 placeholder="Beskriv user story...",
             )
-            # Debug checkbox for story save (register once per story)
-            dbg_save = st.sidebar.checkbox("Debug: story save", key=f"dbg_save_{sid}")
-
             # Save button saves the text and collapses the expander
             if st.button("Spara", key=f"save_{sid}", use_container_width=True):
                 def save_text(r, sid=sid, text_val=None):
@@ -627,16 +611,7 @@ for idx, story in enumerate(stories):
                             # read from session_state to ensure latest typed value
                             obj["text"] = st.session_state.get(f"story_text_{sid}", text_val if text_val is not None else "")
                             break
-                # Debugging: show current state before save in sidebar if enabled
-                if dbg_save:
-                    st.sidebar.write("DEBUG before save_text:")
-                    st.sidebar.write(get_room(room_code).get("stories", []))
-                    st.sidebar.write("Saving text for:", sid)
-                    st.sidebar.write(text_val)
                 update_room(room_code, save_text)
-                if dbg_save:
-                    st.sidebar.write("DEBUG after save_text:")
-                    st.sidebar.write(get_room(room_code).get("stories", []))
                 st.session_state["expanded_story_id"] = None
                 st.rerun()
         
@@ -671,13 +646,7 @@ for idx, story in enumerate(stories):
         # Spara endast via "Spara"-knappen för tydligare UX
     
     # No closing needed; marker styles the immediate next expander
-# Debug: visa stories-data om flagga är satt
-if st.sidebar.checkbox("Visa story-debug (rå data)", value=False, key="story_debug"):
-    st.sidebar.markdown("**DEBUG: stories för rummet**")
-    st.sidebar.write(get_room(room_code).get("stories", []))
-    st.sidebar.markdown("**DEBUG: session keys för story-textarea**")
-    keys = {k: v for k, v in st.session_state.items() if k.startswith("story_text_")}
-    st.sidebar.write(keys)
+# Story debug removed
 # No manual refresh needed; auto-refresh is enabled.
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("<br>", unsafe_allow_html=True)
